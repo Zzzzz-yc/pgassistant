@@ -13,7 +13,7 @@ import pytest
 
 from app.core import config
 from app.db.connection import connect
-from app.services import plan_templates
+from app.services import plan_service, plan_templates
 
 HOST = "http://127.0.0.1:8000"
 SEEDED_SLUG = "cs-basics/array-linkedlist/array"
@@ -604,3 +604,99 @@ def test_templates_meet_quality_bar():
         total = sum(i.est_minutes for s in draft.stages for i in s.items)
         target = draft.weeks * draft.weekly_hours * 60
         assert abs(total - target) / target <= 0.30
+
+
+# ----------------------------------------------------- D25：条目实时解析字段
+
+
+def _resource_row(db_path, slug: str):
+    conn = connect(db_path)
+    try:
+        return conn.execute(
+            "SELECT type, level, is_deleted FROM resources WHERE slug = ?", (slug,)
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def _bound_plan(client, token, slug: str = SEEDED_SLUG) -> dict:
+    """两阶段各 3 条，全部绑同一个资料（满足总条目 5–40 与时长偏差 ≤30%）。"""
+    stages = [
+        _stage("阶段一", items=[_item("任务 %d" % i, slug) for i in range(3)]),
+        _stage("阶段二", items=[_item("任务 %d" % (i + 3), slug) for i in range(3)]),
+    ]
+    return _create(client, token, draft=_draft(stages=stages, weeks=4, weekly_hours=1))
+
+
+def test_item_resolved_type_and_level(client, token, db_path):
+    """绑定了资料 → resource_type / resource_level 来自 resources 的实时值。"""
+    row = _resource_row(db_path, SEEDED_SLUG)
+    assert row is not None and int(row["is_deleted"]) == 0
+
+    plan = _bound_plan(client, token)
+    items = [item for stage in plan["stages"] for item in stage["items"]]
+    assert len(items) == 6
+
+    resp = client.get("/api/plans/%d" % plan["id"], headers=_headers(token))
+    assert resp.status_code == 200, resp.text
+    detail = resp.json()
+    for item in (i for stage in detail["stages"] for i in stage["items"]):
+        assert item["resource_available"] is True
+        assert item["resolved_title"] == "数组"
+        assert item["resource_type"] == row["type"]
+        assert item["resource_level"] == row["level"]
+
+
+def test_unbound_item_has_null_type_and_level(client, token):
+    """未绑定资料 → 两个字段都是 null（且 available=True，API.md §3.14.5）。"""
+    plan = _create(client, token)  # 默认草稿的条目都不绑资料
+    items = [item for stage in plan["stages"] for item in stage["items"]]
+    assert items
+    for item in items:
+        assert item["resource_slug"] is None
+        assert item["resource_type"] is None
+        assert item["resource_level"] is None
+        assert item["resource_available"] is True
+
+
+def test_missing_slug_is_unavailable_with_null_type_and_level(client, token):
+    """slug 不存在 → 双 null + resource_available=False（前端据此标灰并显示「资料已下架」）。"""
+    plan = _create(client, token)
+    stage = plan["stages"][0]
+    created = client.post(
+        "/api/plan-items", headers=_headers(token),
+        json={"stage_id": stage["id"], "title": "幽灵条目",
+              "resource_slug": "cs-basics/does-not-exist/ghost", "note": "",
+              "est_minutes": 30, "order_index": None, "version": plan["version"]},
+    )
+    assert created.status_code == 201, created.text
+    ghost = created.json()["plan"]["stages"][0]["items"][-1]
+    assert ghost["resource_slug"] == "cs-basics/does-not-exist/ghost"
+    assert ghost["resource_available"] is False
+    assert ghost["resolved_title"] is None
+    assert ghost["resource_type"] is None
+    assert ghost["resource_level"] is None
+
+
+def test_resolve_resources_is_one_batch_query(client, token, db_path):
+    """D25：整棵计划只发一条 `resources` 查询，6 条绑定条目也不例外（禁止 N+1）。"""
+    plan = _bound_plan(client, token)
+    conn = connect(db_path)
+    statements: list[str] = []
+    conn.set_trace_callback(statements.append)
+    try:
+        loaded = plan_service.get_plan(conn, plan["id"])
+    finally:
+        conn.set_trace_callback(None)
+        conn.close()
+
+    assert len(loaded.stages) == 2
+    assert sum(len(stage.items) for stage in loaded.stages) == 6
+    resource_selects = [
+        sql for sql in statements if "FROM resources" in sql and "SELECT" in sql.upper()
+    ]
+    assert len(resource_selects) == 1, resource_selects
+    # 一次查询覆盖全部 6 条，且字段确实被填上
+    assert all(item.resource_type is not None for stage in loaded.stages
+               for item in stage.items if item.resource_slug)
+

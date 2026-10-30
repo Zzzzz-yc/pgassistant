@@ -154,7 +154,16 @@
       "all": "All",
       "todo": "Unfinished only",
       "video": "Video only",
-      "videoHint": "Needs a resource type on items: ItemRead has no type field yet (contract gap)"
+      "empty": {
+        "title": "No items match these filters",
+        "description": "Try another combination, or clear the filters to see everything.",
+        "clear": "Clear filters"
+      }
+    },
+    "level": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
     },
     "stage": {
       "items": "{{count}} items",

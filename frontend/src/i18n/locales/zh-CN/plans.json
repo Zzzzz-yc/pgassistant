@@ -154,7 +154,16 @@
       "all": "全部",
       "todo": "只看未完成",
       "video": "只看视频",
-      "videoHint": "需要条目带资料类型字段：当前 ItemRead 不含 type（契约缺口），补字段后开放"
+      "empty": {
+        "title": "没有符合筛选条件的条目",
+        "description": "换一组筛选条件，或把筛选清空看全部条目。",
+        "clear": "清除筛选"
+      }
+    },
+    "level": {
+      "beginner": "入门",
+      "intermediate": "进阶",
+      "advanced": "高级"
     },
     "stage": {
       "items": "{{count}} 条",

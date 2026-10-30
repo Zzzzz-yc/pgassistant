@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 
 import { Badge, Button, Checkbox, Dialog, IconButton, Input, Textarea, cn } from "@/components/ui";
 import { DurationLabel } from "@/components/business/DurationLabel";
+import { TypeIcon } from "@/components/business/TypeIcon";
 import { orderDirection } from "@/features/plans/dnd";
 import type { ItemRead, PlanItemStatus } from "@/types/api";
 
@@ -92,13 +93,23 @@ export function PlanItemRow({
         ariaLabel={item.status === "done" ? t("plan.item.todo") : t("plan.item.done")}
       />
 
-      <span
-        className="plan-item__type"
-        role="img"
-        title={bound ? t("plan.item.bound") : t("plan.item.unbound")}
-        aria-label={bound ? t("plan.item.bound") : t("plan.item.unbound")}
-      >
-        {bound ? <FileText size={14} aria-hidden="true" /> : <PenLine size={14} aria-hidden="true" />}
+      <span className="plan-item__type">
+        {item.resource_type ? (
+          // D25：类型图标来自 resources.type 的实时解析（article/video/course/…）
+          <TypeIcon type={item.resource_type} size={14} />
+        ) : (
+          <span
+            role="img"
+            title={bound ? t("plan.item.bound") : t("plan.item.unbound")}
+            aria-label={bound ? t("plan.item.bound") : t("plan.item.unbound")}
+          >
+            {bound ? (
+              <FileText size={14} aria-hidden="true" />
+            ) : (
+              <PenLine size={14} aria-hidden="true" />
+            )}
+          </span>
+        )}
       </span>
 
       <span className="plan-item__main">
@@ -109,6 +120,12 @@ export function PlanItemRow({
         ) : (
           <span className="plan-item__title plan-item__title--static">{displayTitle}</span>
         )}
+        {/* D25：难度徽章；§9.3 规定 --accent 只用于进度强调与难度 */}
+        {item.resource_level ? (
+          <Badge tone="accent" className="plan-item__level">
+            {t(`plan.level.${item.resource_level}`)}
+          </Badge>
+        ) : null}
         {unavailable ? (
           <Badge tone="neutral" className="plan-item__badge--muted">
             {t("plan.item.unavailable")}

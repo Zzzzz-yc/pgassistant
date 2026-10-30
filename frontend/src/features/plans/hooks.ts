@@ -845,9 +845,6 @@ function skeletonDraft(input: {
   };
 }
 
-/** 计划页里「未完成 / 只看视频」两个筛选（一期 §8.5）。 */
-export type ItemFilter = "all" | "todo" | "video";
-
 /** 阶段大纲（桌面右侧）要用：阶段 id → 标题 + 进度。 */
 export function stageOutline(plan: PlanRead): { id: number; title: string; percent: number }[] {
   return plan.stages.map((stage) => ({

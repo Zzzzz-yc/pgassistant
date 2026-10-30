@@ -38,7 +38,6 @@ import {
   usePlan,
   usePlanListActions,
   usePlanMutations,
-  type ItemFilter,
 } from "@/features/plans/hooks";
 import { ApiError } from "@/lib/http";
 import { useToast } from "@/lib/query";
@@ -72,7 +71,8 @@ export default function PlanPage() {
   const listActions = usePlanListActions();
   const debounce = useDebouncedCommit(300);
 
-  const [filter, setFilter] = useState<ItemFilter>("all");
+  const [onlyTodo, setOnlyTodo] = useState(false);
+  const [onlyVideo, setOnlyVideo] = useState(false);
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set());
   const [dropHint, setDropHint] = useState<DropHint | null>(null);
   const [dragging, setDragging] = useState<{ kind: "stage" | "item"; id: number } | null>(null);
@@ -111,12 +111,18 @@ export default function PlanPage() {
     });
   }, []);
 
+  /**
+   * 两个筛选条件**独立叠加**（§8.5「只看未完成 / 只看视频」）：
+   * 「只看未完成」按条目状态，「只看视频」按 D25 的 `resource_type`。
+   */
   const visibleItems = useCallback(
-    (items: readonly ItemRead[]): ItemRead[] => {
-      if (filter === "todo") return items.filter((item) => item.status === "todo");
-      return [...items];
-    },
-    [filter],
+    (items: readonly ItemRead[]): ItemRead[] =>
+      items.filter((item) => {
+        if (onlyTodo && item.status !== "todo") return false;
+        if (onlyVideo && item.resource_type !== "video") return false;
+        return true;
+      }),
+    [onlyTodo, onlyVideo],
   );
 
   /* ------------------------------------------------------------- 拖拽 */
@@ -250,6 +256,12 @@ export default function PlanPage() {
   const progress = plan.progress;
   const percent = progress?.percent ?? 0;
   const remaining = progress?.remaining_weeks ?? plan.horizon_weeks;
+  // 筛完一条都不剩时给空态（不是空白时间轴）
+  const visibleTotal = plan.stages.reduce(
+    (total, stage) => total + visibleItems(stage.items).length,
+    0,
+  );
+  const filtering = onlyTodo || onlyVideo;
 
   return (
     <section className="page page-enter plan-page">
@@ -354,13 +366,19 @@ export default function PlanPage() {
       <div className="plan-layout">
         <div className="plan-layout__main">
           <div className="plan-filters" role="group" aria-label={t("plan.filter.label")}>
-            <Tag selected={filter === "all"} onClick={() => setFilter("all")}>
+            <Tag
+              selected={!onlyTodo && !onlyVideo}
+              onClick={() => {
+                setOnlyTodo(false);
+                setOnlyVideo(false);
+              }}
+            >
               {t("plan.filter.all")}
             </Tag>
-            <Tag selected={filter === "todo"} onClick={() => setFilter("todo")}>
+            <Tag selected={onlyTodo} onClick={() => setOnlyTodo((value) => !value)}>
               {t("plan.filter.todo")}
             </Tag>
-            <Tag disabled title={t("plan.filter.videoHint")} onClick={() => undefined}>
+            <Tag selected={onlyVideo} onClick={() => setOnlyVideo((value) => !value)}>
               {t("plan.filter.video")}
             </Tag>
           </div>
@@ -372,6 +390,22 @@ export default function PlanPage() {
               action={
                 <Button variant="primary" onClick={() => setAddingStage(true)}>
                   {t("plan.addStage")}
+                </Button>
+              }
+            />
+          ) : filtering && visibleTotal === 0 ? (
+            <EmptyState
+              title={t("plan.filter.empty.title")}
+              description={t("plan.filter.empty.description")}
+              action={
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setOnlyTodo(false);
+                    setOnlyVideo(false);
+                  }}
+                >
+                  {t("plan.filter.empty.clear")}
                 </Button>
               }
             />

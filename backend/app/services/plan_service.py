@@ -551,10 +551,17 @@ def compute_progress(plan: PlanRead) -> PlanProgress:
     )
 
 
-def resolve_titles(conn, items: list[ItemRead]) -> None:
-    """按 `resource_slug` 批量查最新标题，填 `resolved_title` / `resource_available`。
+def resolve_resources(conn, items: list[ItemRead]) -> None:
+    """D25：**一次批量查询**填 4 个实时解析字段（禁止逐条 N+1）。
 
-    资料改名 → 用新标题；资料下架/删除 → `resolved_title=None`，前端回退快照并标灰。
+    查询形状固定为 `SELECT slug, title, type, level, is_deleted FROM resources
+    WHERE slug IN (...)`，按 400 个 slug 一段分片（SQLite 变量上限），每段 1 条 SQL。
+    整棵计划只调一次（`_build_plan` 里对全部条目一次调用）。
+
+    语义矩阵（API.md §3.14.5）：
+      slug=null            → resolved_title=null, available=True,  type=null, level=null
+      有 slug 且行在        → title（实时）,      True,             row.type, row.level
+      有 slug 但行缺失/下架 → null,               False,            null, null
     """
     slugs = sorted({item.resource_slug for item in items if item.resource_slug})
     found: dict[str, dict] = {}
@@ -562,25 +569,41 @@ def resolve_titles(conn, items: list[ItemRead]) -> None:
         chunk = slugs[start:start + 400]
         placeholders = ",".join("?" for _ in chunk)
         rows = conn.execute(
-            "SELECT slug, title, is_deleted FROM resources WHERE slug IN (%s)"
-            % placeholders,
+            "SELECT slug, title, type, level, is_deleted FROM resources"
+            " WHERE slug IN (%s)" % placeholders,
             chunk,
         ).fetchall()
         for row in rows:
-            found[row["slug"]] = {"title": row["title"], "is_deleted": row["is_deleted"]}
+            found[row["slug"]] = {
+                "title": row["title"],
+                "type": row["type"],
+                "level": row["level"],
+                "is_deleted": row["is_deleted"],
+            }
 
     for item in items:
         if item.resource_slug is None:
             item.resolved_title = None
             item.resource_available = True
+            item.resource_type = None
+            item.resource_level = None
             continue
         live = found.get(item.resource_slug)
         if live is None or int(live["is_deleted"]) != 0:
             item.resolved_title = None
             item.resource_available = False
+            item.resource_type = None
+            item.resource_level = None
         else:
             item.resolved_title = live["title"]
             item.resource_available = True
+            item.resource_type = live["type"]
+            item.resource_level = live["level"]
+
+
+def resolve_titles(conn, items: list[ItemRead]) -> None:
+    """旧名保留为 thin wrapper（D25）：实现就是 `resolve_resources`，新代码不要再调它。"""
+    resolve_resources(conn, items)
 
 
 # ---------------------------------------------------------------- 内部工具
@@ -721,7 +744,13 @@ def _needs_renumber(rows: list[sqlite3.Row]) -> bool:
     return False
 
 
-def _item_read(conn, row) -> ItemRead:
+def _item_read(conn, row, *, resolve: bool = True) -> ItemRead:
+    """单行 → `ItemRead`。
+
+    `resolve=False` 用于 `_build_plan`：整棵树的行先全部映射完，再由**一次**
+    `resolve_resources(conn, 全部条目)` 填 4 个实时字段（D25，禁止 N+1）。
+    冲突响应（409 `detail.current`）是单条实体，保持 `resolve=True`。
+    """
     item = ItemRead(
         id=int(row["id"]),
         stage_id=int(row["stage_id"]),
@@ -736,7 +765,8 @@ def _item_read(conn, row) -> ItemRead:
         version=int(row["version"]),
         is_deleted=int(row["is_deleted"]),
     )
-    resolve_titles(conn, [item])
+    if resolve:
+        resolve_resources(conn, [item])
     return item
 
 
@@ -778,13 +808,16 @@ def _build_plan(conn, plan_row) -> PlanRead:
     ).fetchall()
 
     stages: list[StageRead] = []
+    all_items: list[ItemRead] = []
     for stage_row in stage_rows:
         item_rows = conn.execute(
             "SELECT * FROM plan_items WHERE stage_id = ? AND is_deleted = 0"
             " ORDER BY order_index, id",
             (stage_row["id"],),
         ).fetchall()
-        items = [_item_read(conn, row) for row in item_rows]
+        # 先不解析：整棵树的条目一次性交给 resolve_resources（D25：1 条 SQL，无 N+1）
+        items = [_item_read(conn, row, resolve=False) for row in item_rows]
+        all_items.extend(items)
         stages.append(
             StageRead(
                 id=int(stage_row["id"]),
@@ -797,6 +830,8 @@ def _build_plan(conn, plan_row) -> PlanRead:
                 progress=None,
             )
         )
+
+    resolve_resources(conn, all_items)
 
     plan = _plan_read_base(plan_row, stages=stages, progress=None)
     progress = compute_progress(plan)
