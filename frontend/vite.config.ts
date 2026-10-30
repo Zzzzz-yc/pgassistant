@@ -100,6 +100,11 @@ export default defineConfig({
     proxy: {
       // 同源代理：浏览器看到的 Origin 是 :5173，后端靠 PG_DEV_ORIGINS 放行写操作
       "/api": { target: BACKEND_ORIGIN, changeOrigin: true },
+      // 内容媒体（D24 24.1：`/media/*` 免令牌，但 Vite 必须把它转给后端）：
+      // 不代理的话 `/media/…` 会被 Vite 自己的 SPA 回退成 index.html，
+      // dev 下 `<img src="/media/…">` 直接裂图——`<img>` 带不了 X-App-Token，
+      // 只能靠「同源 + 后端 /media 路由」这条路。
+      "/media": { target: BACKEND_ORIGIN, changeOrigin: true },
     },
   },
   build: {

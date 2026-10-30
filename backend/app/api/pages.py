@@ -143,7 +143,10 @@ def spa_fallback(full_path: str):
     """
     if full_path == "api" or full_path.startswith("api/"):
         raise _not_found()
-    if full_path.split("/", 1)[0] in {"docs", "redoc", "openapi.json", "assets"}:
+    # `media` 也是服务端前缀（D24 24.1：`/media/*` 由 api/media.py 提供，免令牌）：
+    # 真文件由 media.router 在 pages.router 之前接管；这里只保证「缺文件/未实现」时
+    # 返回 JSON 404，而不是把一张图片的 URL 回退成 200 的 index.html。
+    if full_path.split("/", 1)[0] in {"docs", "redoc", "openapi.json", "assets", "media"}:
         raise _not_found()
 
     built = dist_index()
