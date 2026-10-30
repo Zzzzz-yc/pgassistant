@@ -49,6 +49,7 @@ from .api import (
 )
 from .core import errors
 from .core.config import SETTINGS
+from .core.logging import configure_logging
 from .core.security import SecurityPolicy, new_token
 from .db import migrate
 from .middleware.guard import SecurityGuard
@@ -88,6 +89,9 @@ _register_static_mime_types()
 
 # 一次性令牌：每进程一枚，不持久化、不落盘（§13.7）
 APP_TOKEN = new_token()
+# 日志在最早的可用点落地（§12.3）：data/logs/app.log，JSON Lines，5MB × 5 轮转。
+# 令牌不落盘（§13.7），所以把它交给日志层：文件里出现时替换成 ***。
+configure_logging(secrets=(APP_TOKEN,))
 POLICY = SecurityPolicy(
     token=APP_TOKEN,
     port=SETTINGS.port,
@@ -98,11 +102,8 @@ POLICY = SecurityPolicy(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logging.basicConfig(
-        level=getattr(logging, SETTINGS.log_level, logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s [%(request_id)s]: %(message)s",
-    )
-    # §12.3：每条日志都带 request_id（没有请求上下文时是 "-"）
+    # 日志 handler 已在模块导入时由 configure_logging() 装好（data/logs/app.log），
+    # 这里只给它们补 request_id 过滤器（§12.3：每条日志都带 request_id）
     install_log_filter()
     log.info("X-App-Token=%s（随进程重启更换）", APP_TOKEN)
     log.info("允许的 Host: 127.0.0.1 / localhost / [::1]；Origin: %s",

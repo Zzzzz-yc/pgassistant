@@ -233,6 +233,10 @@ Write-Ok "索引就绪"
 $port = Find-FreePort -Start 8000 -End 8010
 if (-not $port) { Stop-Fatal "8000–8010 都被占用了，先关掉其它实例。" }
 
+# 配置端口必须与监听端口一致：core/config.py 按 PG_PORT 生成 Origin 白名单，
+# 只传 --port 而不同步 PG_PORT，选到 8001 时所有写操作都会被 403 BAD_ORIGIN 挡掉。
+$env:PG_PORT = "$port"
+
 $env:PYTHONPATH = Join-Path $Root "backend"
 if ($Dev) {
     # 开发态：Vite :5173 的写请求要过 Origin 白名单

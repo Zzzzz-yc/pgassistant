@@ -103,6 +103,10 @@ find_port() {
 PORT="$(find_port)" || die "8000–8010 都被占用了，先关掉其它实例。"
 BASE_URL="http://127.0.0.1:$PORT"
 
+# 配置端口必须与监听端口一致：core/config.py 按 PG_PORT 生成 Origin 白名单，
+# 只传 --port 而不同步 PG_PORT，选到 8001 时所有写操作都会被 403 BAD_ORIGIN 挡掉。
+export PG_PORT="$PORT"
+
 export PYTHONPATH="$ROOT/backend"
 if [ "$DEV" -eq 1 ]; then
   export PG_DEV_ORIGINS="http://127.0.0.1:5173"
