@@ -11,23 +11,28 @@
  * - 资料不存在或已下架（404 `RESOURCE_NOT_FOUND`）走“已下架”空状态，不是白屏、不弹 alert。
  */
 import { ArrowLeft, ArrowRight, List, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { EmptyState } from "@/components/business/EmptyState";
 import { ErrorState } from "@/components/business/ErrorState";
-import { MarkdownView } from "@/components/business/MarkdownView";
+import { MarkdownView, type CodeActionsRenderer } from "@/components/business/MarkdownView";
 import { ResourceCard } from "@/components/business/ResourceCard";
 import { DurationLabel } from "@/components/business/DurationLabel";
 import { TypeIcon } from "@/components/business/TypeIcon";
 import { Badge, Button, Separator, Skeleton, Tag } from "@/components/ui";
 import type { ApiError } from "@/lib/http";
-import type { ResourceSummary, TocNode } from "@/types/api";
+import type { ResourceDetail, ResourceSummary, TocNode } from "@/types/api";
 
 import { AddToPlanDialog } from "@/features/library/AddToPlanDialog";
 import { getScrollContainer, useRelated, useResource, useTaxonomyData } from "@/features/library/hooks";
 import { libraryHref, mediaUrl, resourceHref } from "@/features/library/media";
+import { CodeRunnerPanel } from "@/features/runner/components/CodeRunnerPanel";
+import { RunButton } from "@/features/runner/components/RunButton";
+import { runnerLangOf } from "@/features/runner/languages";
+import type { RunnerLang } from "@/features/runner/protocol";
+import { useRunnerEnabled } from "@/features/runner/settings";
 
 import "./library.css";
 
@@ -46,6 +51,12 @@ export default function ResourcePage() {
   const related = useRelated(slug);
   const taxonomy = useTaxonomyData();
   const [addOpen, setAddOpen] = useState(false);
+  // 运行抽屉的请求（M6）：非 null 即展开。只在 `runnable` 资料上可能被点开。
+  const [runnerRequest, setRunnerRequest] = useState<{ lang: RunnerLang; code: string } | null>(null);
+  const closeRunner = useMemo(() => () => setRunnerRequest(null), []);
+  // 设置项 `runner_enabled` 关闭时入口全部消失（§20.5-7）：抽屉也不该留在屏幕上
+  const { enabled: runnerEnabled } = useRunnerEnabled();
+  const runnerOpen = runnerRequest !== null && runnerEnabled;
 
   const notFound = detail.error?.code === "RESOURCE_NOT_FOUND";
 
@@ -152,15 +163,15 @@ export default function ResourcePage() {
 
       <div className="rp__body">
         <article className="rp__article">
-          <MarkdownView
-            markdown={resource.body_md}
-            toc={toc}
-            mediaBase={resource.media_base}
+          <ArticleBody
+            resource={resource}
             lightboxLabel={t("lightbox")}
+            onRun={(lang, code) => setRunnerRequest({ lang, code })}
           />
         </article>
 
-        {toc.length > 0 ? <TocAside nodes={toc} title={t("toc")} /> : null}
+        {/* §9.5：抽屉展开时右侧目录自动隐藏（共用右侧空间），收起即恢复 */}
+        {toc.length > 0 && !runnerOpen ? <TocAside nodes={toc} title={t("toc")} /> : null}
       </div>
 
       <Separator />
@@ -233,11 +244,69 @@ export default function ResourcePage() {
         slug={resource.slug}
         title={resource.title}
       />
+
+      {/* 运行抽屉（M6）：只有资料标记了 runnable 才可能被打开；关闭即清空，不记历史 */}
+      <CodeRunnerPanel
+        open={runnerOpen}
+        onOpenChange={(open) => {
+          if (!open) closeRunner();
+        }}
+        lang={runnerRequest?.lang ?? "python"}
+        initialCode={runnerRequest?.code ?? ""}
+        resourceTitle={resource.title}
+      />
     </section>
   );
 }
 
 /* ------------------------------------------------------------------ 子组件 */
+
+/**
+ * 正文 + 代码块运行入口。
+ *
+ * `codeActions` 用 `useMemo` 固定身份：`MarkdownView` 把它放进内部 `components` 的依赖里，
+ * 每次渲染换一个新函数会让整棵 Markdown 子树重新挂载（滚动位置丢失）。所以这里只在
+ * `runnable` 变化时重建，且 `runnable` 为空时**一律不传**——非算法页零差异（§20.1）。
+ */
+function ArticleBody({
+  resource,
+  lightboxLabel,
+  onRun,
+}: {
+  resource: ResourceDetail;
+  lightboxLabel: string;
+  onRun: (lang: RunnerLang, code: string) => void;
+}) {
+  const runnable = resource.runnable;
+  const { enabled, supported } = useRunnerEnabled();
+
+  const codeActions = useMemo<CodeActionsRenderer | undefined>(() => {
+    if (!runnable || runnable.length === 0) return undefined;
+    // 开关关闭 / 浏览器不支持时**连槽位都不挂**，不给 19 个空 span 留位置
+    if (!enabled || !supported) return undefined;
+    return (lang, code) => (
+      <RunButton
+        lang={lang}
+        code={code}
+        runnable={runnable}
+        onOpen={({ lang: opened }) => {
+          const mapped = runnerLangOf(opened);
+          if (mapped) onRun(mapped, code);
+        }}
+      />
+    );
+  }, [runnable, onRun, enabled, supported]);
+
+  return (
+    <MarkdownView
+      markdown={resource.body_md}
+      toc={resource.toc ?? []}
+      mediaBase={resource.media_base}
+      lightboxLabel={lightboxLabel}
+      codeActions={codeActions}
+    />
+  );
+}
 
 function DetailSkeleton() {
   return (

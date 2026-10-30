@@ -128,7 +128,24 @@ function rehypeHeadingAnchors(options: { toc?: readonly TocNode[] }) {
 
 /* ------------------------------------------------------------------ 代码块 */
 
-function CodeBlock({ children }: { children: ReactNode }) {
+/** 从 React 树里取出纯文本（`rehype-highlight` 会包一层 span，文本仍是原文）。 */
+function reactText(node: ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(reactText).join("");
+  if (isValidElement<{ children?: ReactNode }>(node)) return reactText(node.props.children);
+  return "";
+}
+
+function CodeBlock({
+  children,
+  index,
+  codeActions,
+}: {
+  children: ReactNode;
+  index: number;
+  codeActions?: CodeActionsRenderer;
+}) {
   const preRef = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -138,6 +155,9 @@ function CodeBlock({ children }: { children: ReactNode }) {
       ? firstChild.props.className
       : "";
   const language = /language-([\w+#.-]+)/.exec(rawClass)?.[1] ?? "text";
+
+  // 加法能力（M6）：不传 `codeActions` 时这里恒为 null，行为与加 prop 之前完全一致
+  const actions = codeActions ? codeActions(language, reactText(children), index) : null;
 
   return (
     <div className="md-code">
@@ -160,6 +180,7 @@ function CodeBlock({ children }: { children: ReactNode }) {
             {copied ? "已复制" : "复制"}
           </Button>
         </span>
+        {actions ? <span className="md-code__actions">{actions}</span> : null}
       </div>
       <pre ref={preRef} className="md-code__pre">
         {children}
@@ -256,6 +277,12 @@ function createUrlTransform(mediaBase: string | undefined) {
 
 /* --------------------------------------------------------------------- 组件 */
 
+/**
+ * 代码块右上角的追加操作（M6 加法能力）：返回的节点渲染在「复制」按钮右侧。
+ * 不传时 `MarkdownView` 的输出与引入该 prop 之前逐字节一致。
+ */
+export type CodeActionsRenderer = (lang: string, code: string, index: number) => ReactNode;
+
 export interface MarkdownViewProps {
   /** 正文 Markdown（`ResourceDetail.body_md` 或助手回复）。 */
   markdown: string;
@@ -271,6 +298,11 @@ export interface MarkdownViewProps {
    * 不传则完全保持原样（D24-24.2）。
    */
   mediaBase?: string;
+  /**
+   * 追加到每个代码块右上角的操作（M6 代码运行用；只有算法页会传）。
+   * `lang` 是代码围栏语言原文、`code` 是该块纯文本、`index` 是按文档顺序从 0 起的序号。
+   */
+  codeActions?: CodeActionsRenderer;
   className?: string;
 }
 
@@ -280,9 +312,14 @@ export function MarkdownView({
   proseWidth,
   lightboxLabel = "图片预览",
   mediaBase,
+  codeActions,
   className,
 }: MarkdownViewProps) {
   const [zoom, setZoom] = useState<{ src: string; alt: string } | null>(null);
+
+  // 代码块序号：每次渲染从这里归零，`pre` 的渲染函数按文档顺序自增（见下面的 components）
+  const blockIndex = useRef(0);
+  blockIndex.current = 0;
 
   const urlTransform = useMemo(() => createUrlTransform(mediaBase), [mediaBase]);
 
@@ -298,7 +335,11 @@ export function MarkdownView({
 
   const components = useMemo<Components>(
     () => ({
-      pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
+      pre: ({ children }) => (
+        <CodeBlock index={blockIndex.current++} codeActions={codeActions}>
+          {children}
+        </CodeBlock>
+      ),
       img: ({ src, alt, title }) => {
         const source = typeof src === "string" ? src : "";
         if (!source) return null;
@@ -333,7 +374,7 @@ export function MarkdownView({
         );
       },
     }),
-    [lightboxLabel],
+    [lightboxLabel, codeActions],
   );
 
   return (
