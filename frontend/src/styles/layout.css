@@ -24,6 +24,7 @@
   z-index: var(--z-topbar);
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;          /* 任何宽度下都不换行（375 下靠下面两组断点收缩） */
   gap: var(--space-4);
   height: var(--topbar-height);
   padding: 0 var(--space-6);
@@ -34,6 +35,7 @@
 .topbar__brand {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;             /* 品牌不参与挤压，宽度由文字/图标决定 */
   gap: var(--space-2);
   color: var(--text);
   font-family: var(--font-title);
@@ -48,6 +50,7 @@
 
 .topbar__brand-mark {
   color: var(--primary);
+  flex: 0 0 auto;
 }
 
 .topbar__search {
@@ -55,6 +58,7 @@
   align-items: center;
   gap: var(--space-2);
   flex: 1 1 auto;
+  min-width: 0;               /* 允许收缩，否则长文案会把顶栏撑破 */
   max-width: 420px;
   height: 36px;
   padding: 0 var(--space-3);
@@ -71,10 +75,15 @@
 
 .topbar__search-label {
   flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;        /* 永不换行：换行会让 36px 的搜索框顶出顶栏 */
 }
 
 .topbar__kbd {
+  flex: 0 0 auto;
   padding: 0 var(--space-1);
   color: var(--text-muted);
   background: var(--surface);
@@ -82,11 +91,13 @@
   border-radius: var(--radius-control);
   font-family: var(--font-mono);
   font-size: var(--font-size-code);
+  white-space: nowrap;
 }
 
 .topbar__actions {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: var(--space-1);
   margin-left: auto;
 }
@@ -528,7 +539,24 @@
   }
 
   .topbar__search {
+    /* 手机/平板上搜索入口收成 36×36 的图标按钮：文字标签与 Ctrl K 提示都藏掉，
+       点击仍然打开命令面板（按钮的 aria-label 还在）。这样 375 宽下
+       菜单 + 品牌 + 搜索 + 三个图标入口不会换行，也不会横向滚动。 */
+    flex: 0 0 auto;
+    justify-content: center;
+    width: 36px;
     max-width: none;
+    padding: 0;
+    margin-left: auto;
+  }
+
+  .topbar__search-label,
+  .topbar__kbd {
+    display: none;
+  }
+
+  .topbar__actions {
+    margin-left: 0;
   }
 
   /* 移动端侧栏收进抽屉：默认移出视口，加 .is-open 才进来 */
@@ -567,5 +595,22 @@
 @media (min-width: 768px) {
   .sidebar__scrim {
     display: none;
+  }
+}
+
+/* 窄手机（≤479，含 375 / 360 / 320）：品牌只留图标，给搜索与三个入口让位。
+   `aria-label` 在 Topbar.tsx 上，读屏软件仍能念出 "pgassistant"。 */
+@media (max-width: 479px) {
+  .topbar {
+    gap: var(--space-2);
+    padding: 0 var(--space-2);
+  }
+
+  .topbar__brand-name {
+    display: none;
+  }
+
+  .topbar__link {
+    padding: var(--space-2);
   }
 }

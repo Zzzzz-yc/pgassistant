@@ -35,9 +35,9 @@ export function Topbar({ onOpenSearch, onOpenMenu }: TopbarProps) {
         <Menu size={18} aria-hidden="true" />
       </button>
 
-      <Link to="/" className="topbar__brand">
+      <Link to="/" className="topbar__brand" aria-label={t("brand")}>
         <BookOpen size={18} className="topbar__brand-mark" aria-hidden="true" />
-        {t("brand")}
+        <span className="topbar__brand-name">{t("brand")}</span>
       </Link>
 
       <button
