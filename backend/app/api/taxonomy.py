@@ -98,6 +98,17 @@ def load_labels() -> dict[str, dict]:
         return {}
 
 
+def _dedupe_keep_order(values):
+    """去重但**保持传入顺序**（D25 25.5：`levels` / `types` 按数量降序，不能打回字典序）。"""
+    seen = set()
+    ordered = []
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            ordered.append(value)
+    return ordered
+
+
 @router.get("/taxonomy")
 def api_taxonomy(conn=Depends(get_conn)):
     rows = conn.execute("""
@@ -126,7 +137,8 @@ def api_taxonomy(conn=Depends(get_conn)):
 
     return {
         "stacks": result,
-        "levels": sorted(set(levels)),
-        "types": sorted(set(types)),
+        # D25 25.5：按数量降序（`ORDER BY n DESC` 已经查好了，别再 `sorted(set())` 打回字典序）
+        "levels": _dedupe_keep_order(levels),
+        "types": _dedupe_keep_order(types),
         "total": sum(s["total"] for s in stacks.values()),
     }

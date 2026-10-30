@@ -3,6 +3,10 @@
 `GET` 是 M1 已实现的端点，`POST` 是 M2 新增的命令面板入口（DECISIONS D1）：
 两者**语义与响应结构完全一致**，只是参数位置不同，因此共用 `_run()`。
 零结果（`total == 0`）一律写 `search_misses`（§9.9），GET 与 POST 都写。
+
+M5 起 `_run()` 走 `services/search_semantic.py` 的混合排序（§6.5）：
+配了 embedding 且向量可用时按 `0.65*bm25 + 0.35*cos` 合并；否则**静默降级纯 FTS**
+（§6.6：不报 `NO_EMBEDDING` 错，只把 `semantic_available` / `notice` 告诉前端）。
 """
 import time
 
@@ -10,7 +14,8 @@ from fastapi import APIRouter, Depends, Query
 
 from ..api.deps import get_conn
 from ..schemas.models import SearchRequest
-from ..services.search import record_miss, search
+from ..services import search_semantic
+from ..services.search import record_miss
 
 router = APIRouter()
 
@@ -34,11 +39,13 @@ def _filters(stack, category, level, rtype, include_overview) -> dict:
 def _run(conn, q, stack, category, level, rtype, limit, include_overview) -> dict:
     """GET 与 POST 的唯一实现：一次检索 + 耗时 + 零结果记账。"""
     started = time.perf_counter()
-    result = search(
+    result = search_semantic.hybrid_search(
         conn, q, stack=stack, level=level, rtype=rtype,
         category=category, limit=limit, include_overview=include_overview,
     )
     took_ms = max(int((time.perf_counter() - started) * 1000), 0)
+    # `semantic` 的三态：None=没配（不提示）/ False=配了但降级（提示）/ True=用了混合排序
+    semantic = result.get("semantic")
 
     payload = {
         "query": q,
@@ -47,9 +54,8 @@ def _run(conn, q, stack, category, level, rtype, limit, include_overview) -> dic
         "total": result["total"],
         "items": result["items"],
         "took_ms": took_ms,
-        # M2 没有语义检索（M5 才接）：null = 本次没走向量，不提示、不报错（§6.6 / §7.9）
-        "semantic_available": None,
-        "notice": None,
+        "semantic_available": semantic,
+        "notice": search_semantic.notice(conn) if semantic is False else None,
     }
     if result["total"] == 0:
         record_miss(conn, q, _filters(stack, category, level, rtype, include_overview))

@@ -141,8 +141,8 @@ def head_media(path: str, request: Request) -> Response:
 
 
 # 显式回 405：本版 FastAPI 在「方法不匹配」时若找不到同路径的其它处理器，会给
-# `404 NOT_FOUND`（`/api/resources` 的 POST 也是这个行为），而 `API.md` §3.26 要求
-# `405`（`flatten_http_exception` 归到 `BAD_REQUEST`）。所以这里自己声明其余方法。
+# `404 NOT_FOUND`（`/api/resources` 的 POST 也是这个行为），而 `API.md` §3.26 / D25 25.6
+# 要求 405 + 独立码 `METHOD_NOT_ALLOWED`。所以这里自己声明其余方法。
 @router.api_route(
     "/media/{path:path}",
     methods=["POST", "PUT", "PATCH", "DELETE"],
@@ -152,7 +152,7 @@ def media_method_not_allowed(path: str) -> JSONResponse:
     return JSONResponse(
         status_code=405,
         content=errors.error_payload(
-            "BAD_REQUEST",
+            errors.METHOD_NOT_ALLOWED,
             "内容媒体只支持 GET / HEAD",
             detail={"method": "not allowed"},
             hint="浏览器 <img> 只会发 GET；HEAD 用于探测",

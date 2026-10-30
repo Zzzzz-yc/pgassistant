@@ -34,12 +34,17 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .api import (
     agent,
     deps,
+    fallback,
+    index,
     media,
+    media_private,
     pages,
     plan_templates,
     plans,
+    private,
     resources,
     search,
+    settings as settings_api,
     taxonomy,
 )
 from .core import errors
@@ -47,6 +52,13 @@ from .core.config import SETTINGS
 from .core.security import SecurityPolicy, new_token
 from .db import migrate
 from .middleware.guard import SecurityGuard
+from .middleware.request_id import (
+    RequestIDMiddleware,
+    install_log_filter,
+    request_id_of,
+    with_request_id,
+)
+from .services import embeddings
 from .services.llm_client import load_embedding_config, load_llm_config
 
 APP_VERSION = "0.2.0"
@@ -88,8 +100,10 @@ POLICY = SecurityPolicy(
 async def lifespan(app: FastAPI):
     logging.basicConfig(
         level=getattr(logging, SETTINGS.log_level, logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        format="%(asctime)s %(levelname)s %(name)s [%(request_id)s]: %(message)s",
     )
+    # §12.3：每条日志都带 request_id（没有请求上下文时是 "-"）
+    install_log_filter()
     log.info("X-App-Token=%s（随进程重启更换）", APP_TOKEN)
     log.info("允许的 Host: 127.0.0.1 / localhost / [::1]；Origin: %s",
              ", ".join(sorted(POLICY.allowed_origins)))
@@ -108,6 +122,16 @@ async def lifespan(app: FastAPI):
                 log.info("今日备份: %s", saved)
         except OSError as exc:                   # 备份失败不拦启动，但要留痕
             log.warning("每日备份失败（继续启动）: %s", exc)
+        # §6.4：启动时把向量矩阵载进内存（没有向量时只是空矩阵，不影响 FTS）
+        try:
+            conn = deps.connect(deps.DB_PATH)
+            try:
+                if embeddings.warm_cache(conn):
+                    log.info("语义检索向量已载入内存")
+            finally:
+                conn.close()
+        except Exception as exc:                 # 载入失败只降级，不拦启动
+            log.warning("向量矩阵载入失败（继续启动）: %s", type(exc).__name__)
     yield
 
 
@@ -132,6 +156,8 @@ app.add_middleware(
 )
 # 最后添加 = 最外层：Host 不合法时连 CORS 预处理都不给
 app.add_middleware(SecurityGuard, policy=POLICY)
+# request_id 必须是最外层（比鉴权更外）：403 拒绝也要带 X-Request-Id（§9.9 / §12.3）
+app.add_middleware(RequestIDMiddleware)
 
 app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(resources.router, prefix="/api", tags=["resources"])
@@ -140,6 +166,13 @@ app.include_router(plans.router, prefix="/api", tags=["plans"])
 app.include_router(plan_templates.router, prefix="/api", tags=["plan-templates"])
 # 助手（M4）：`/api/agent/*`。必须早于 pages 的 SPA 回退（同 /media 的理由）。
 app.include_router(agent.router, prefix="/api", tags=["agent"])
+# 打磨（M5）：设置 / 索引 / 私有资料。同样早于 pages 的 SPA 回退。
+app.include_router(settings_api.router, prefix="/api", tags=["settings"])
+app.include_router(index.router, prefix="/api", tags=["index"])
+app.include_router(private.router, prefix="/api", tags=["private"])
+# 私有媒体（M5，D24）：**必须早于 media.router**，否则 `/media/{path:path}` 先命中，
+# 把 `private/...` 整段当成内容媒体的相对路径（media.py 对 private 前缀恒 404）。
+app.include_router(media_private.router, tags=["media-private"])
 # 内容媒体（D24）：**不在 `/api` 前缀下**，因此天然免 X-App-Token；
 # Sec-Fetch-Site 与路径校验在 api/media.py 里，中间件（含 EXEMPT_API_PATHS）不动。
 # 必须早于 pages 的 SPA 回退 `/{full_path:path}`，否则 /media/* 会被吞成 HTML。
@@ -183,9 +216,18 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
     注册的是 Starlette 基类：路由层的 404/405 抛的是它，fastapi.HTTPException
     是它的子类，异常处理器按 MRO 查找，两个都能命中。
+
+    `5xx` 补 `request_id`（§9.9）：顶层 + `detail.request_id` 各一份，
+    与响应头 `X-Request-Id` 同值。
     """
     payload = errors.flatten_http_exception(exc.status_code, exc.detail)
-    return JSONResponse(status_code=exc.status_code, content=payload, headers=exc.headers)
+    headers = dict(exc.headers or {})
+    if exc.status_code >= 500:
+        payload = with_request_id(payload, request)
+        # ServerErrorMiddleware 在最外层，5xx 的响应头可能不经过 request_id 中间件，
+        # 所以这里显式补一次（与 body 里的 request_id 同值，§9.9）
+        headers.setdefault("X-Request-Id", request_id_of(request))
+    return JSONResponse(status_code=exc.status_code, content=payload, headers=headers)
 
 
 @app.exception_handler(RequestValidationError)
@@ -206,10 +248,38 @@ async def request_validation_handler(request: Request, exc: RequestValidationErr
 async def sqlite_error_handler(request: Request, exc: sqlite3.OperationalError):
     return JSONResponse(
         status_code=503,
-        content=errors.error_payload(
-            errors.DB_NOT_READY, "数据库不可用",
-            detail=str(exc),
-            hint="先运行 python backend/scripts/bootstrap_index.py 建库",
+        headers={"X-Request-Id": request_id_of(request)},
+        content=with_request_id(
+            errors.error_payload(
+                errors.DB_NOT_READY, "数据库不可用",
+                detail=str(exc),
+                hint="先运行 python backend/scripts/bootstrap_index.py 建库",
+            ),
+            request,
+        ),
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """未捕获异常 → 500 `INTERNAL`，**必须带 request_id**（§9.9 / §12.3）。
+
+    Starlette 的 ServerErrorMiddleware 用这个处理器产出响应；默认的
+    `PlainTextResponse("Internal Server Error")` 没有错误信封，前端没法按 code 分支。
+    `str(exc)` 不进 `message`（可能含绝对路径 / 上游细节），只写到服务端日志。
+    """
+    log.exception("未捕获异常：%s", type(exc).__name__)
+    rid = request_id_of(request)
+    return JSONResponse(
+        status_code=500,
+        headers={"X-Request-Id": rid},
+        content=with_request_id(
+            errors.error_payload(
+                errors.INTERNAL,
+                "服务内部错误",
+                hint="复制 request_id 反馈问题；日志在 data/logs/app.log",
+            ),
+            request,
         ),
     )
 
@@ -218,9 +288,9 @@ async def sqlite_error_handler(request: Request, exc: sqlite3.OperationalError):
 def health():
     """不鉴权的存活探针：只暴露「能不能用」，不暴露任何内容。
 
-    `model_configured` / `embedding_configured` 是 API.md §6 第 6 行的契约义务
-    （M4/M5 必做）：助手入口与设置页靠它们决定显示引导卡片还是表单。
-    只返回布尔，不暴露 base_url / model / key（§13.1）。
+    `model_configured` / `embedding_configured` / `index_version` 是 API.md §6 第 6 行
+    的契约义务（M4/M5 必做）：助手入口与设置页靠它们决定显示引导卡片还是表单。
+    只返回布尔与内容指纹，不暴露 base_url / model / key（§13.1）。
     """
     db_path = deps.DB_PATH
     payload = {
@@ -229,6 +299,7 @@ def health():
         "schema_version": None,
         "version": APP_VERSION,
         "index": None,
+        "index_version": None,
         "model_configured": False,
         "embedding_configured": False,
     }
@@ -241,13 +312,15 @@ def health():
     try:
         payload["schema_version"] = migrate.current_version(conn)
         row = conn.execute(
-            "SELECT file_count, last_indexed_at FROM index_state WHERE id = 1"
+            "SELECT file_count, last_indexed_at, content_version"
+            " FROM index_state WHERE id = 1"
         ).fetchone()
         if row:
             payload["index"] = {
                 "files": row["file_count"],
                 "indexed_at": row["last_indexed_at"],
             }
+            payload["index_version"] = row["content_version"]
         # 配置读取只回布尔；M5 接管 settings 后这里不用改
         payload["model_configured"] = load_llm_config(conn) is not None
         payload["embedding_configured"] = load_embedding_config(conn) is not None
@@ -257,6 +330,10 @@ def health():
         conn.close()
     return payload
 
+
+# 405 兜底：必须在**所有** `/api/*` 真实路由之后（含上面装饰器注册的 `/api/health`），
+# 且在 pages 的 SPA 回退之前（见 api/fallback.py 的文件头）。
+app.include_router(fallback.router, tags=["fallback"])
 
 # 必须最后 include：pages 里含 SPA 回退 `/{full_path:path}`，
 # 提前注册会把 /api/* 与 /api/health 吞成 HTML（见上面的顺序说明）。
