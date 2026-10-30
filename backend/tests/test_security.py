@@ -115,7 +115,8 @@ def test_health_needs_no_token(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["db_ready"] is True
-    assert body["schema_version"] == 1
+    # 最新 schema 版本：v1 建表 + 0002 软删除升级（migrations/0002_soft_delete.py）
+    assert body["schema_version"] == 2
 
 
 def test_valid_token_reads_api(client, token):
