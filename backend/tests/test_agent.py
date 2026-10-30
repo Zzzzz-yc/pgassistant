@@ -264,6 +264,80 @@ def test_learning_keyword_downgrades_out_of_scope():
     assert decision.source == "rule"
 
 
+# --------------------------------------------------------------- P1：任务委托型越界
+TASK_DELEGATION_SAMPLES = [
+    "帮我写个快排",
+    "帮我写个 Python 脚本",
+    "替我实现一个登录接口",
+    "给我改这段代码",
+    "帮我调试一下这个报错",
+    "帮我做个贪心算法",
+]
+STUDY_SAMPLES = [
+    "帮我做个前端学习计划",
+    "帮我找闭包的资料",
+    "帮我看看这个计划合不合理",
+]
+
+
+def test_task_delegation_rule_guards_study_requests():
+    """§7.3 示例走新规则；学习/计划/检索类请求一律不判越界（宁可漏拒）。"""
+    for sample in TASK_DELEGATION_SAMPLES:
+        assert router_pkg.rules.is_task_delegation(sample) is True, sample
+        assert router_pkg.decide(sample).intent.value == "OUT_OF_SCOPE", sample
+    for sample in STUDY_SAMPLES:
+        assert router_pkg.rules.is_task_delegation(sample) is False, sample
+        assert router_pkg.decide(sample).intent.value != "OUT_OF_SCOPE", sample
+    # 超过 30 字的委托不再是"顺手要个产物"，交给 L2
+    assert router_pkg.rules.is_task_delegation("帮我写" + "字" * 40) is False
+
+
+@pytest.mark.parametrize("message", TASK_DELEGATION_SAMPLES)
+def test_task_delegation_rejected_without_llm(client, token, llm, message):
+    """6 条必须拒：统一话术、零 LLM 调用、帧形态固定为 intent/delta/done。"""
+    resp = client.post("/api/agent/chat", headers=headers(token),
+                       json={"message": message})
+    assert resp.status_code == 200, message
+    frames = parse_sse(resp.text)
+    assert [name for name, _ in frames] == ["intent", "delta", "done"], message
+    assert frames[0][1]["intent"] == "OUT_OF_SCOPE", message
+    assert frames[0][1]["source"] == "rule"
+    assert "写代码/调试不在我的范围内" in frames[1][1]["text"]
+    assert frames[-1][1]["kind"] == "text"
+    assert llm.calls == 0
+
+
+@pytest.mark.parametrize("message, expected", [
+    ("帮我找闭包的资料", "RESOURCE_SEARCH"),
+    ("帮我做个前端学习计划", "PLAN_CREATE"),
+    ("帮我看看这个计划合不合理", "CLARIFY"),
+])
+def test_task_delegation_does_not_reject_study_requests(client, token, llm, message,
+                                                        expected):
+    """3 条必须放行：一条都不许落成 OUT_OF_SCOPE。"""
+    if expected == "PLAN_CREATE":
+        llm.responses.append(chat_response(classification_payload(slots={
+            "goal": "前端开发", "weeks": 4, "weekly_hours": 1,
+            "level": "beginner", "stack": "frontend",
+        })))
+        llm.responses.append(chat_response(json.dumps(draft_payload(), ensure_ascii=False)))
+    elif expected == "CLARIFY":
+        llm.responses.append(chat_response(classification_payload(
+            intent="CLARIFY", confidence=0.3, slots=None)))
+
+    resp = client.post("/api/agent/chat", headers=headers(token),
+                       json={"message": message})
+    assert resp.status_code == 200, message
+    frames = parse_sse(resp.text)
+    assert frames[0][1]["intent"] == expected, message
+    assert frames[0][1]["intent"] != "OUT_OF_SCOPE"
+    if expected == "PLAN_CREATE":
+        assert frames[-1][1]["kind"] == "plan_draft"
+    elif expected == "RESOURCE_SEARCH":
+        assert llm.calls == 0                          # 检索不需要模型
+        assert frames[-1][1]["kind"] == "search"
+
+
 def test_greeting_and_capability():
     assert router_pkg.decide("你好！").intent.value == "GREETING"
     assert router_pkg.decide("hi").intent.value == "GREETING"

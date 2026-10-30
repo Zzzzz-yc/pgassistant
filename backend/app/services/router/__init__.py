@@ -142,8 +142,8 @@ class RouteDecision:
 def decide(text: str, *, locale: str = "zh-CN") -> RouteDecision:
     """只跑 L1。命中即返回；**没命中时返回 `source="fallback"`**，由调用方决定是否进 L2。
 
-    优先级（§7.4）：OUT_OF_SCOPE > GREETING/CAPABILITY > RESOURCE_SEARCH > L2。
-    注入检测排在越界之后、问候之前：命中就不把这段输入送进模型（§13.5）。
+    优先级（§7.4）：OUT_OF_SCOPE（原正则）| TASK_DELEGATION > 注入 > GREETING/CAPABILITY
+    > RESOURCE_SEARCH > L2。注入检测排在越界之后、问候之前：命中就不把这段输入送进模型（§13.5）。
     """
     body = normalize(text)
     if not body:
@@ -152,7 +152,8 @@ def decide(text: str, *, locale: str = "zh-CN") -> RouteDecision:
             needs_clarify=True, clarify_options=clarify_options(locale),
         )
 
-    if rules.is_out_of_scope(body):
+    # §7.3 的「帮我写个快排」型委托：与 §7.4 原正则同优先级，同样零 LLM。
+    if rules.is_out_of_scope(body) or rules.is_task_delegation(body):
         return RouteDecision(intent=Intent.OUT_OF_SCOPE, confidence=1.0, source="rule")
     if rules.looks_like_injection(body):
         return RouteDecision(
