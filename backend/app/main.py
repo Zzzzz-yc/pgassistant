@@ -24,12 +24,14 @@ for p in (str(BACKEND), str(PROJECT / ".deps")):
         sys.path.insert(0, p)
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .api import deps, pages, resources, search, taxonomy
+from .api import deps, pages, plan_templates, plans, resources, search, taxonomy
 from .core import errors
 from .core.config import SETTINGS
 from .core.security import SecurityPolicy, new_token
@@ -123,6 +125,8 @@ app.add_middleware(SecurityGuard, policy=POLICY)
 app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(resources.router, prefix="/api", tags=["resources"])
 app.include_router(taxonomy.router, prefix="/api", tags=["taxonomy"])
+app.include_router(plans.router, prefix="/api", tags=["plans"])
+app.include_router(plan_templates.router, prefix="/api", tags=["plan-templates"])
 
 
 class AssetsMount:
@@ -165,6 +169,20 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """
     payload = errors.flatten_http_exception(exc.status_code, exc.detail)
     return JSONResponse(status_code=exc.status_code, content=payload, headers=exc.headers)
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_handler(request: Request, exc: RequestValidationError):
+    """字段级校验失败也走 §11 错误信封（默认的 {"detail": [...]} 没有 code）。"""
+    return JSONResponse(
+        status_code=422,
+        content=errors.error_payload(
+            "VALIDATION_ERROR",
+            "请求参数不合法",
+            detail=jsonable_encoder(exc.errors()),
+            hint="检查请求体字段类型与取值范围",
+        ),
+    )
 
 
 @app.exception_handler(sqlite3.OperationalError)

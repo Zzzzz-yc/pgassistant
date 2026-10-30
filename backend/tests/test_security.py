@@ -57,14 +57,15 @@ def test_write_without_origin_is_rejected(client, token):
 
 
 def test_write_with_same_origin_passes_guard(client, token):
-    """过了中间件就够了：这条路由还没实现，404 说明已放行。"""
+    """过了中间件就够了：空 body 走到路由后应是 422（校验失败），而不是 403。"""
     resp = client.post(
         "/api/plans",
         headers={"X-App-Token": token, "Origin": HOST_127},
         json={},
     )
-    assert resp.status_code == 404
-    assert _code(resp) == "NOT_FOUND"
+    assert resp.status_code in (400, 422)          # 400 兼容 LLM/业务前置校验的分支
+    assert _code(resp) not in {"BAD_HOST", "BAD_ORIGIN", "MISSING_ORIGIN", "CROSS_SITE",
+                               "TOKEN_MISSING", "TOKEN_INVALID"}
 
 
 def test_cross_site_fetch_metadata_is_rejected(client, token):
