@@ -161,6 +161,10 @@ export interface ResourceSummary {
   source_url: string | null;
   /** 列表接口当前不返回，详情返回。 */
   url?: string | null;
+  /**
+   * 封面图的 content 根相对路径（可为 null）。
+   * 可访问 URL = `/media/{cover_path}`；空值表示没有封面，**不要**自己拼前缀（D24）。
+   */
   cover_path?: string | null;
   /** 列表接口当前不返回；详情返回。 */
   tags?: string[];
@@ -192,6 +196,11 @@ export interface ResourceDetail extends ResourceSummary {
   toc?: TocNode[];
   prev?: ResourceRef | null;
   next?: ResourceRef | null;
+  /**
+   * 正文媒体的基目录（content 根相对路径，如 `frontend/react`）；M2 起必返，M1 响应没有该字段。
+   * 正文里的相对 `src` 解析为 `/media/{media_base}/{src}`；空串表示按 content 根解析（D24）。
+   */
+  media_base?: string;
 }
 
 export interface ResourceListResponse {

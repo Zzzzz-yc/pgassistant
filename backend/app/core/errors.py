@@ -20,6 +20,9 @@ RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"
 DB_NOT_READY = "DB_NOT_READY"
 SCHEMA_TOO_NEW = "SCHEMA_TOO_NEW"
 INTERNAL = "INTERNAL"
+# D24 / API.md §3.26：`/media/*` 的路径非法、扩展名不在白名单或文件不存在 → HTTP 404。
+# 常量只登记码本身；message / hint 由调用点给（风格见 API.md §1.6 与 §5 的示例）。
+MEDIA_NOT_FOUND = "MEDIA_NOT_FOUND"
 
 
 def error_payload(code: str, message: str, detail=None, hint=None) -> dict:

@@ -258,7 +258,11 @@ class ResourceSummary(_Model):
     license: str = Field(default="", max_length=64)
     source_url: str | None = Field(default=None, max_length=500)
     url: str | None = Field(default=None, max_length=500)
-    cover_path: str | None = Field(default=None, max_length=300)
+    cover_path: str | None = Field(
+        default=None,
+        max_length=300,
+        description="封面图的 content 根相对路径（可为 null）；可访问 URL = `/media/{cover_path}`（D24）",
+    )
     tags: list[str] = Field(default_factory=list, max_length=8)
     runnable: list[str] | None = Field(default=None, description="可站内运行的语言（§20.1）")
     lang: str = Field(default="zh", min_length=2, max_length=10)
@@ -297,6 +301,14 @@ class ResourceDetail(ResourceSummary):
     toc: list[TocNode] = Field(default_factory=list)
     prev: ResourceRef | None = None
     next: ResourceRef | None = None
+    media_base: str = Field(
+        default="",
+        max_length=300,
+        description=(
+            "正文媒体的基目录（content 根相对路径，如 `frontend/react`）；"
+            "相对 `src` 解析为 `/media/{media_base}/{src}`，空串表示按 content 根解析（D24）"
+        ),
+    )
 
 
 class ResourceListResponse(_Model):
