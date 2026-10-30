@@ -1,0 +1,38 @@
+name: 功能建议
+description: 提出新功能、改进现有交互，或补充内容方向
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解决什么问题
+      description: 先写使用场景与痛点，再写期望的功能形态。
+      placeholder: 例如：计划页想按周折叠，现在只能按阶段折叠，12 周计划滚动太长
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你希望的方案
+      description: 一两句话说清交互或行为即可；不确定实现方式也没关系。
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 影响范围
+      description: 选最接近的一项，维护者会再核对。
+      options:
+        - 资料库 / 检索
+        - 资料详情 / 阅读体验
+        - 学习计划
+        - 助手对话
+        - 代码运行（站内 WASM）
+        - 设置 / 私有资料
+        - 内容补充（新资料、新分类）
+        - 其它
+    validations:
+      required: true

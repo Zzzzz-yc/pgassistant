@@ -24,6 +24,14 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+# 测试与分词缓存（可随时删除，重跑即重建）
+jieba.cache
+pytest-of-*/
+
+# 测试临时目录（pytest --basetemp / vite 临时产物；即便落在 data/ 下也显式忽略）
+data/.vite-tmp/
+data/.pytest-tmp*/
+
 # Node
 node_modules/
 dist/
@@ -35,6 +43,8 @@ dist/
 logs/
 tmp/
 .cache/
+.m3-*
+.shots/
 
 # 编辑器 / 系统
 .idea/
@@ -50,3 +60,8 @@ Thumbs.db
 
 # 交接包备份（项目根就是本仓库，这里只作为后备资料库，绝不入库）
 handoff/
+
+# Pyodide 运行时副本（M6 由 frontend/scripts/copy-pyodide.mjs 在 predev/prebuild 生成，
+# 13 MB 二进制不入库；离线前提是至少完成过一次 npm install）
+frontend/public/assets/pyodide/
+frontend/public/pyodide/

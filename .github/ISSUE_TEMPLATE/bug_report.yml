@@ -1,0 +1,41 @@
+name: 缺陷报告
+description: 报告一个 bug，或指出某篇资料的内容问题（图片打不开、链接失效、正文错误）
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 一句话说清现象。内容问题请给出资料 slug 或 `content/` 下的路径。
+      placeholder: |
+        例如：搜索「闭包」返回空结果
+        例如：`frontend/react/react-hooks` 详情页的配图打不开
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 从启动开始的几步操作；能稳定复现最有用。
+      placeholder: |
+        1. `.\start.ps1`
+        2. 打开 http://127.0.0.1:8000/library
+        3. 筛选 stack=frontend
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: 操作系统 + Python / Node 版本（`python -V`、`node -v`）。
+      placeholder: "Windows 11 · Python 3.12.2 · Node 24.19.0"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 报错或截图
+      description: 前端错误码（如 `TOKEN_MISSING` / `LLM_TIMEOUT`）与控制台输出。**不要粘贴 api_key。**
+      render: text
