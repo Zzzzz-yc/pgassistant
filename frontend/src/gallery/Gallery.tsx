@@ -205,6 +205,31 @@ const EVIL_MD = [
   "**这一段必须照常可见**——sanitize 只剥危险节点，不吞正文。",
 ].join("\n");
 
+// D24-24.2：相对媒体路径改写样例。`mediaBase="/frontend/react"` 时：
+// `./assets/a.png` → `/media/frontend/react/assets/a.png`；`../javascript/b.png` → `/media/frontend/javascript/b.png`；
+// `../../../escape.png` 逃出 content 根 → 原样返回；绝对/协议相对/根相对 URL 与 .md 链接一律不动。
+// 说明：`/media/*` 端点由资料页（M2）实现，dev 下这些图片会 404 —— 这里看的是 `src`/`href` 是否被改写。
+const MEDIA_MD = [
+  "## 相对媒体路径（mediaBase）",
+  "",
+  "![同目录](./assets/a.png)",
+  "",
+  "![上一级](../javascript/b.png)",
+  "",
+  "![逃出根](../../../escape.png)",
+  "",
+  "![绝对 URL](https://example.com/x.png)",
+  "",
+  "![协议相对](//cdn.example.com/x.png)",
+  "",
+  "![根相对](/assets/root.png)",
+  "",
+  "- [媒体链接](./assets/c.webp)",
+  "- [文档链接](./notes.md)",
+  "- [锚点](#section)",
+  "- [外链](https://example.com/doc)",
+].join("\n");
+
 const SELECT_OPTIONS = [
   { value: "beginner", label: "入门" },
   { value: "intermediate", label: "进阶" },
@@ -869,6 +894,13 @@ export function Gallery() {
           <MarkdownView markdown={NORMAL_MD} toc={DEMO_TOC} />
           <Separator />
           <MarkdownView markdown={EVIL_MD} toc={DEMO_TOC} />
+          <Separator />
+          <div id="g-media">
+            <h3 className="g-inline-note">
+              D24 相对媒体改写（mediaBase="/frontend/react"；图片 404 属预期，看 src/href 是否被改写）
+            </h3>
+            <MarkdownView markdown={MEDIA_MD} mediaBase="/frontend/react" />
+          </div>
         </Section>
 
         <Section

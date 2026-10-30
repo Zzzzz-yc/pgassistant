@@ -22,7 +22,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import ReactMarkdown, { type Components, type Options as ReactMarkdownOptions } from "react-markdown";
+import ReactMarkdown, {
+  defaultUrlTransform,
+  type Components,
+  type Options as ReactMarkdownOptions,
+} from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
@@ -164,6 +168,92 @@ function CodeBlock({ children }: { children: ReactNode }) {
   );
 }
 
+/* ---------------------------------------------------- 相对媒体路径改写（D24） */
+
+/**
+ * `/media/*` 媒体白名单（D24-24.1 第 5 条）：只有这些扩展名才可能被改写成媒体 URL。
+ * `.md` / 无扩展名 / 锚点一律不动，避免把站内文档链接误当媒体（D24-24.2 第 3 条的保守读法）。
+ */
+const MEDIA_EXTENSIONS = new Set(["webp", "png", "jpg", "jpeg", "gif", "svg", "avif"]);
+
+/** 带 scheme、协议相对、根相对、纯锚点/查询串 —— 这些一律原样保留。 */
+const KEEP_AS_IS = /^(?:[a-z][a-z0-9+.-]*:|\/\/|\/|#|\?)/i;
+
+function isRelativePath(value: string): boolean {
+  return value.length > 0 && !KEEP_AS_IS.test(value);
+}
+
+/** 把 `?query` / `#fragment` 与路径分开，避免它们被当成路径段。 */
+function splitSuffix(value: string): { path: string; suffix: string } {
+  const index = value.search(/[?#]/);
+  return index === -1
+    ? { path: value, suffix: "" }
+    : { path: value.slice(0, index), suffix: value.slice(index) };
+}
+
+function extensionOf(path: string): string {
+  const match = /\.([a-z0-9]+)$/i.exec(path);
+  return match ? match[1].toLowerCase() : "";
+}
+
+/**
+ * `mediaBase` + 相对路径 → `/media/...`。
+ *
+ * 逐段解析 `.` / `..`（保留相对路径的原有语义）；`..` 在已经退到 content 根时再出现即判定为
+ * **逃逸**，返回 `null`（调用方回退原值，交给后端 404）。绝不产出 `/media/../` 这种路径。
+ */
+function toMediaPath(path: string, mediaBase: string | undefined): string | null {
+  const segments: string[] = [];
+  const all = [...(mediaBase ?? "").split("/"), ...path.split("/")];
+
+  for (const segment of all) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      if (segments.length === 0) return null;
+      segments.pop();
+      continue;
+    }
+    segments.push(segment);
+  }
+
+  return segments.length > 0 ? `/media/${segments.join("/")}` : null;
+}
+
+function mediaUrlFor(value: string, mediaBase: string | undefined): string | null {
+  if (!isRelativePath(value)) return null;
+  const { path, suffix } = splitSuffix(value);
+  if (!path) return null;
+  const rewritten = toMediaPath(path, mediaBase);
+  return rewritten ? `${rewritten}${suffix}` : null;
+}
+
+/**
+ * react-markdown 的 `urlTransform`：先过一遍默认安全过滤（`javascript:` 之类会被它清空），
+ * 再按 D24-24.2 改写相对媒体路径。
+ *
+ * - 未传 `mediaBase`（`undefined`）：**行为与加这个 prop 之前完全一致**，只做默认过滤；
+ * - `mediaBase` 为空串：按 content 根解析（`/media/{src}`）；
+ * - `img src`：相对路径一律改写；
+ * - `a href`：只有扩展名在媒体白名单里才改写。
+ */
+function createUrlTransform(mediaBase: string | undefined) {
+  return (url: string, key: string): string => {
+    const safe = defaultUrlTransform(url);
+    if (!safe) return safe; // 被默认安全过滤拦掉的（javascript: / vbscript: 等）
+    if (mediaBase === undefined) return safe;
+
+    if (key === "src") {
+      return mediaUrlFor(safe, mediaBase) ?? safe;
+    }
+    if (key === "href") {
+      const { path } = splitSuffix(safe);
+      if (!MEDIA_EXTENSIONS.has(extensionOf(path))) return safe;
+      return mediaUrlFor(safe, mediaBase) ?? safe;
+    }
+    return safe;
+  };
+}
+
 /* --------------------------------------------------------------------- 组件 */
 
 export interface MarkdownViewProps {
@@ -175,6 +265,12 @@ export interface MarkdownViewProps {
   proseWidth?: number;
   /** 灯箱标题后缀（默认用 alt）。 */
   lightboxLabel?: string;
+  /**
+   * 这篇资料所在目录的 content 根相对路径（`ResourceDetail.media_base`，如 `frontend/react`）。
+   * 给了才改写正文里的相对媒体路径：`./a.png` → `/media/frontend/react/a.png`；
+   * 不传则完全保持原样（D24-24.2）。
+   */
+  mediaBase?: string;
   className?: string;
 }
 
@@ -183,9 +279,12 @@ export function MarkdownView({
   toc,
   proseWidth,
   lightboxLabel = "图片预览",
+  mediaBase,
   className,
 }: MarkdownViewProps) {
   const [zoom, setZoom] = useState<{ src: string; alt: string } | null>(null);
+
+  const urlTransform = useMemo(() => createUrlTransform(mediaBase), [mediaBase]);
 
   // 显式标注类型：数组里混着"插件"与"[插件, 选项]"两种形状，靠推断会退化成联合类型
   const rehypePlugins = useMemo<NonNullable<ReactMarkdownOptions["rehypePlugins"]>>(
@@ -244,6 +343,7 @@ export function MarkdownView({
           remarkPlugins={[remarkGfm]}
           rehypePlugins={rehypePlugins}
           components={components}
+          urlTransform={urlTransform}
         >
           {markdown}
         </ReactMarkdown>
