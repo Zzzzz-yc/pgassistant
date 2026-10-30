@@ -31,12 +31,23 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .api import deps, media, pages, plan_templates, plans, resources, search, taxonomy
+from .api import (
+    agent,
+    deps,
+    media,
+    pages,
+    plan_templates,
+    plans,
+    resources,
+    search,
+    taxonomy,
+)
 from .core import errors
 from .core.config import SETTINGS
 from .core.security import SecurityPolicy, new_token
 from .db import migrate
 from .middleware.guard import SecurityGuard
+from .services.llm_client import load_embedding_config, load_llm_config
 
 APP_VERSION = "0.2.0"
 log = logging.getLogger("pgassistant")
@@ -127,6 +138,8 @@ app.include_router(resources.router, prefix="/api", tags=["resources"])
 app.include_router(taxonomy.router, prefix="/api", tags=["taxonomy"])
 app.include_router(plans.router, prefix="/api", tags=["plans"])
 app.include_router(plan_templates.router, prefix="/api", tags=["plan-templates"])
+# 助手（M4）：`/api/agent/*`。必须早于 pages 的 SPA 回退（同 /media 的理由）。
+app.include_router(agent.router, prefix="/api", tags=["agent"])
 # 内容媒体（D24）：**不在 `/api` 前缀下**，因此天然免 X-App-Token；
 # Sec-Fetch-Site 与路径校验在 api/media.py 里，中间件（含 EXEMPT_API_PATHS）不动。
 # 必须早于 pages 的 SPA 回退 `/{full_path:path}`，否则 /media/* 会被吞成 HTML。
@@ -203,7 +216,12 @@ async def sqlite_error_handler(request: Request, exc: sqlite3.OperationalError):
 
 @app.get("/api/health", tags=["health"])
 def health():
-    """不鉴权的存活探针：只暴露「能不能用」，不暴露任何内容。"""
+    """不鉴权的存活探针：只暴露「能不能用」，不暴露任何内容。
+
+    `model_configured` / `embedding_configured` 是 API.md §6 第 6 行的契约义务
+    （M4/M5 必做）：助手入口与设置页靠它们决定显示引导卡片还是表单。
+    只返回布尔，不暴露 base_url / model / key（§13.1）。
+    """
     db_path = deps.DB_PATH
     payload = {
         "status": "ok",
@@ -211,6 +229,8 @@ def health():
         "schema_version": None,
         "version": APP_VERSION,
         "index": None,
+        "model_configured": False,
+        "embedding_configured": False,
     }
     if not db_path.exists():
         return payload
@@ -228,6 +248,9 @@ def health():
                 "files": row["file_count"],
                 "indexed_at": row["last_indexed_at"],
             }
+        # 配置读取只回布尔；M5 接管 settings 后这里不用改
+        payload["model_configured"] = load_llm_config(conn) is not None
+        payload["embedding_configured"] = load_embedding_config(conn) is not None
     except sqlite3.Error:
         payload["db_ready"] = False
     finally:
