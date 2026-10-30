@@ -146,7 +146,7 @@ export interface TaxonomyResponse {
 
 /** 列表/搜索结果里的一条资料。 */
 export interface ResourceSummary {
-  /** 内部自增主键，**前端不得使用**（§5.1）；列表接口不返回。 */
+  /** 内部自增主键，**前端不得使用**（§5.1）；列表接口不返回，仅详情返回（D2 / D25）。 */
   id?: number | null;
   slug: Slug;
   title: string;
@@ -358,6 +358,15 @@ export interface ItemRead {
   /** 按 slug 实时查到的标题；null = 资料已下架（回退快照并标灰）。 */
   resolved_title: string | null;
   resource_available: boolean;
+  /**
+   * 按 `resource_slug` 实时解析的资料类型（§8.5 条目行类型图标 /「只看视频」筛选，D25）。
+   * null = 未绑定资料或资料已下架。
+   * 现状：键已随 Pydantic 模型输出，但解析未落地，**值恒为 null**（计划模块待办）；
+   * 所以先写可选，且**不得**把 null 当"无类型"的权威判断。落地后由契约层收紧为必填。
+   */
+  resource_type?: ResourceType | null;
+  /** 按 `resource_slug` 实时解析的难度（§8.5 难度徽章，D25）；null 语义同 `resource_type`。 */
+  resource_level?: Level | null;
 }
 
 export interface StageRead {

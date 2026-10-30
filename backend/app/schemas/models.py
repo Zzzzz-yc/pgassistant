@@ -245,7 +245,14 @@ def _split_runnable(value):
 class ResourceSummary(_Model):
     """列表/搜索结果里的一条资料（§11 GET /api/resources 的 items 元素）。"""
 
-    id: int | None = Field(default=None, ge=1, description="内部自增主键，前端不得使用（§5.1）")
+    id: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "内部自增主键，**仅详情**（ResourceDetail）返回；列表/搜索响应不返回该键，"
+            "前端一律不得使用（§5.1 / D2 / D25）"
+        ),
+    )
     slug: Slug
     title: str = Field(min_length=1, max_length=80)
     summary: str = Field(default="", max_length=200)
@@ -476,6 +483,20 @@ class ItemRead(_Model):
         default=None, max_length=80, description="按 slug 实时查到的标题；null=资料已下架"
     )
     resource_available: bool = True
+    resource_type: ResourceType | None = Field(
+        default=None,
+        description=(
+            "按 resource_slug 从 resources 表实时解析的资料类型（§8.5 条目行类型图标/"
+            "「只看视频」筛选，D25）；null = 未绑定资料或资料已下架"
+        ),
+    )
+    resource_level: Level | None = Field(
+        default=None,
+        description=(
+            "按 resource_slug 从 resources 表实时解析的难度（§8.5 难度徽章，D25）；"
+            "null 语义同 resource_type"
+        ),
+    )
 
 
 class StageRead(_Model):
