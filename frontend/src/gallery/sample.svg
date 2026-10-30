@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360" role="img" aria-label="画廊示例插图">
+  <!-- 组件画廊的示例图片（dev only）。颜色取自 tokens.css 的同一组色值，
+       因为独立 SVG 文件读不到页面的 CSS 变量。 -->
+  <rect width="640" height="360" fill="#FAFAF8" />
+  <rect x="40" y="40" width="260" height="280" rx="10" fill="#FFFFFF" stroke="#E7E5E0" />
+  <rect x="64" y="72" width="150" height="14" rx="7" fill="#2F5D50" opacity="0.85" />
+  <rect x="64" y="104" width="210" height="8" rx="4" fill="#6B6B66" opacity="0.35" />
+  <rect x="64" y="124" width="196" height="8" rx="4" fill="#6B6B66" opacity="0.25" />
+  <rect x="64" y="144" width="204" height="8" rx="4" fill="#6B6B66" opacity="0.25" />
+  <rect x="64" y="196" width="120" height="26" rx="13" fill="#C8862B" opacity="0.18" />
+  <rect x="64" y="196" width="120" height="26" rx="13" fill="none" stroke="#C8862B" opacity="0.5" />
+  <circle cx="480" cy="150" r="70" fill="none" stroke="#2F5D50" stroke-width="10" opacity="0.18" />
+  <circle cx="480" cy="150" r="70" fill="none" stroke="#2F5D50" stroke-width="10" stroke-linecap="round"
+          stroke-dasharray="440" stroke-dashoffset="150" transform="rotate(-90 480 150)" />
+  <text x="480" y="158" text-anchor="middle" font-family="Georgia, serif" font-size="26" fill="#1A1A1A">34%</text>
+  <rect x="360" y="248" width="240" height="8" rx="4" fill="#E7E5E0" />
+  <rect x="360" y="248" width="96" height="8" rx="4" fill="#2F5D50" />
+  <text x="360" y="288" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#6B6B66">组件画廊示例插图</text>
+</svg>

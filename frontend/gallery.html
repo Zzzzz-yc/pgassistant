@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>组件画廊 · pgassistant（仅开发态）</title>
+    <!--
+      组件画廊（Owner：组件库 M2）。
+      **只在 dev 可达**：`vite build` 的 rollup input 默认只有 index.html，
+      这个文件不会被生产构建打包（不需要改 vite.config.ts，改它属于 M0 的所有权）。
+      用法：npm run dev 后打开 http://127.0.0.1:5173/gallery.html
+      画廊不依赖后端：命令面板的"静态展示"复用 .cp 样式，不触发检索。
+    -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>组件画廊需要启用 JavaScript。</noscript>
+    <script type="module" src="/src/gallery/main.tsx"></script>
+  </body>
+</html>

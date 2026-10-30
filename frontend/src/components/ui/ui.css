@@ -1,0 +1,1964 @@
+/*
+ * 组件库样式（Owner：组件库 M2，`frontend/src/components/ui/**`）。
+ *
+ * 铁律（docs/contracts/MODULES.md §1.2 + 需求文档 §9.3）：
+ * - **本文件不出现任何色值字面量**，一律 `var(--…)` 或 `color-mix(… var(--…))`；
+ *   要换主题只改 `src/styles/tokens.css`。
+ * - 五态齐全：`.force-hover` / `.force-focus` / `.force-active` 是**画廊专用**的强制态
+ *   选择器（dev 组件画廊用它把 hover / focus / active 三种瞬时态固定下来截图），
+ *   生产里不会有人加这三个类。
+ * - 动效只用 §9.2 第 4 条允许的三件事（hover 位移 2px、淡入、shimmer），全部 150ms ease-out。
+ */
+
+/* ---------------------------------------------------------------- 通用小件 */
+
+/* 图标与文字基线对齐；lucide 图标默认 block，行内场景要收回来 */
+.ui-inline-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+/* 五个状态里"不可交互"的统一表达：opacity 降到 0.45 + 禁止指针 */
+.ui-disabled,
+.ui-btn:disabled,
+.ui-btn[aria-disabled="true"],
+.ui-input:disabled,
+.ui-textarea:disabled,
+.ui-checkbox:disabled,
+.ui-radio:disabled,
+.ui-switch:disabled,
+.ui-tag:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* =============================================================== Button */
+
+.ui-btn {
+  --ui-btn-height: 36px;
+  --ui-btn-padding-x: var(--space-4);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: max-content;
+  height: var(--ui-btn-height);
+  padding: 0 var(--ui-btn-padding-x);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font-family: var(--font-body);
+  font-size: var(--font-size-body-sm);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast) var(--transition-easing),
+    border-color var(--transition-fast) var(--transition-easing),
+    color var(--transition-fast) var(--transition-easing),
+    transform var(--transition-fast) var(--transition-easing);
+}
+
+.ui-btn:hover,
+.ui-btn.force-hover {
+  text-decoration: none;
+}
+
+.ui-btn:active,
+.ui-btn.force-active {
+  transform: translateY(1px);
+}
+
+.ui-btn:focus-visible,
+.ui-btn.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* 尺寸 */
+.ui-btn--sm {
+  --ui-btn-height: 28px;
+  --ui-btn-padding-x: var(--space-3);
+  font-size: var(--font-size-code);
+}
+
+.ui-btn--lg {
+  --ui-btn-height: 44px;
+  --ui-btn-padding-x: var(--space-6);
+  font-size: var(--font-size-body);
+}
+
+.ui-btn--block {
+  width: 100%;
+}
+
+/* 变体：primary ------------------------------------------------------- */
+.ui-btn--primary {
+  color: var(--surface);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.ui-btn--primary:hover,
+.ui-btn--primary.force-hover {
+  background: color-mix(in srgb, var(--primary) 86%, var(--text));
+  border-color: color-mix(in srgb, var(--primary) 86%, var(--text));
+}
+
+.ui-btn--primary:active,
+.ui-btn--primary.force-active {
+  background: color-mix(in srgb, var(--primary) 74%, var(--text));
+  border-color: color-mix(in srgb, var(--primary) 74%, var(--text));
+}
+
+/* 变体：secondary ----------------------------------------------------- */
+.ui-btn--secondary {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.ui-btn--secondary:hover,
+.ui-btn--secondary.force-hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.ui-btn--secondary:active,
+.ui-btn--secondary.force-active {
+  background: var(--primary-soft-hover);
+}
+
+/* 变体：ghost --------------------------------------------------------- */
+.ui-btn--ghost {
+  color: var(--text-muted);
+  background: transparent;
+  border-color: transparent;
+}
+
+.ui-btn--ghost:hover,
+.ui-btn--ghost.force-hover {
+  color: var(--text);
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+.ui-btn--ghost:active,
+.ui-btn--ghost.force-active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+/* 变体：danger -------------------------------------------------------- */
+.ui-btn--danger {
+  color: var(--surface);
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.ui-btn--danger:hover,
+.ui-btn--danger.force-hover {
+  background: color-mix(in srgb, var(--danger) 86%, var(--text));
+  border-color: color-mix(in srgb, var(--danger) 86%, var(--text));
+}
+
+.ui-btn--danger:active,
+.ui-btn--danger.force-active {
+  background: color-mix(in srgb, var(--danger) 74%, var(--text));
+  border-color: color-mix(in srgb, var(--danger) 74%, var(--text));
+}
+
+/* loading：文案保留（避免宽度跳动），左侧换成 Spinner ---------------
+ * loading 时按钮同时是 disabled（防重复提交），但**不能**跟着降透明度，
+ * 否则"正在提交"看起来像"不可用"。 */
+.ui-btn.is-loading,
+.ui-btn.is-loading:disabled,
+.ui-btn.is-loading[aria-disabled="true"] {
+  opacity: 1;
+  cursor: progress;
+}
+
+.ui-btn.is-loading .ui-btn__label {
+  opacity: 0.75;
+}
+
+/* =========================================================== IconButton */
+
+.ui-icon-btn {
+  width: var(--ui-btn-height, 36px);
+  min-width: var(--ui-btn-height, 36px);
+  padding: 0;
+}
+
+/* ============================================================ Input/Field */
+
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.ui-field__label {
+  color: var(--text);
+  font-size: var(--font-size-body-sm);
+  font-weight: 500;
+}
+
+.ui-field__required {
+  margin-left: var(--space-1);
+  color: var(--danger);
+}
+
+.ui-field__hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: var(--line-height-tight);
+}
+
+.ui-field__error {
+  color: var(--danger);
+  font-size: 12px;
+  line-height: var(--line-height-tight);
+}
+
+.ui-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ui-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--space-3);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font-family: var(--font-body);
+  font-size: var(--font-size-body-sm);
+  transition: border-color var(--transition-fast) var(--transition-easing),
+    background-color var(--transition-fast) var(--transition-easing);
+}
+
+.ui-input::placeholder,
+.ui-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.ui-input:hover:not(:disabled),
+.ui-input.force-hover {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+}
+
+/* active：文本控件绝大多数时间在同一次点击里就进入 focus，所以 active 只做一层很轻的
+ * 底色反馈（4% primary 混合），避免"按下瞬间毫无变化"；不改变边框宽度，避免抖动。 */
+.ui-input:active:not(:disabled),
+.ui-input.force-active,
+.ui-textarea:active:not(:disabled),
+.ui-textarea.force-active {
+  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 70%, var(--border));
+}
+
+.ui-input:focus,
+.ui-input.force-focus,
+.ui-textarea:focus,
+.ui-textarea.force-focus {
+  border-color: var(--primary);
+}
+
+.ui-input:focus-visible,
+.ui-input.force-focus,
+.ui-textarea:focus-visible,
+.ui-textarea.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.ui-input:disabled,
+.ui-textarea:disabled {
+  color: var(--text-muted);
+  background: var(--bg);
+}
+
+.ui-input[aria-invalid="true"],
+.ui-textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.ui-input--sm {
+  height: 28px;
+  font-size: var(--font-size-code);
+}
+
+.ui-input--lg {
+  height: 44px;
+  font-size: var(--font-size-body);
+}
+
+.ui-input--with-icon {
+  padding-left: var(--space-8);
+}
+
+.ui-input__icon {
+  position: absolute;
+  left: var(--space-3);
+  display: inline-flex;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.ui-input__trailing {
+  position: absolute;
+  right: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+/* ============================================================== Textarea */
+
+.ui-textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font-family: var(--font-body);
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-body);
+  resize: vertical;
+  transition: border-color var(--transition-fast) var(--transition-easing);
+}
+
+.ui-textarea:hover:not(:disabled),
+.ui-textarea.force-hover {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+}
+
+/* ================================================================= Select */
+
+.ui-select__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--space-3);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-body-sm);
+  text-align: left;
+  transition: border-color var(--transition-fast) var(--transition-easing),
+    background-color var(--transition-fast) var(--transition-easing);
+}
+
+.ui-select__trigger:hover:not(:disabled),
+.ui-select__trigger.force-hover,
+.ui-select__trigger[data-state="open"] {
+  border-color: var(--primary);
+}
+
+.ui-select__trigger:active:not(:disabled),
+.ui-select__trigger.force-active {
+  background: var(--primary-soft);
+}
+
+.ui-select__trigger:focus-visible,
+.ui-select__trigger.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.ui-select__trigger[data-placeholder] {
+  color: var(--text-muted);
+}
+
+.ui-select__trigger--sm {
+  height: 28px;
+  font-size: var(--font-size-code);
+}
+
+.ui-select__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-select__chevron {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast) var(--transition-easing);
+}
+
+.ui-select__trigger[data-state="open"] .ui-select__chevron {
+  transform: rotate(180deg);
+}
+
+.ui-select__content {
+  z-index: var(--z-dropdown);
+  min-width: var(--radix-select-trigger-width);
+  max-height: 280px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+}
+
+.ui-select__viewport {
+  padding: var(--space-1);
+}
+
+.ui-select__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-body-sm);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+
+.ui-select__item[data-highlighted] {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.ui-select__item[data-state="checked"] {
+  font-weight: 600;
+}
+
+.ui-select__item[data-disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-select__check {
+  color: var(--primary);
+}
+
+/* ============================================================== Combobox */
+
+.ui-combobox {
+  position: relative;
+}
+
+.ui-combobox__list {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  z-index: var(--z-dropdown);
+  max-height: 260px;
+  overflow-y: auto;
+  padding: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+}
+
+.ui-combobox__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-body-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ui-combobox__option:hover,
+.ui-combobox__option.force-hover {
+  background: var(--bg);
+}
+
+.ui-combobox__option[aria-selected="true"] {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.ui-combobox__option:active,
+.ui-combobox__option.force-active {
+  background: var(--primary-soft-hover);
+}
+
+.ui-combobox__option:focus-visible,
+.ui-combobox__option.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.ui-combobox__empty {
+  padding: var(--space-3);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ============================================================== Checkbox */
+
+.ui-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-size: var(--font-size-body-sm);
+  user-select: none;
+}
+
+.ui-checkbox__box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  color: var(--surface);
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 55%, var(--border));
+  border-radius: 4px;
+  transition: background-color var(--transition-fast) var(--transition-easing),
+    border-color var(--transition-fast) var(--transition-easing);
+}
+
+.ui-checkbox:hover .ui-checkbox__box,
+.ui-checkbox__box.force-hover {
+  border-color: var(--primary);
+}
+
+.ui-checkbox:active .ui-checkbox__box,
+.ui-checkbox__box.force-active {
+  background: var(--primary-soft);
+}
+
+.ui-checkbox__box:focus-visible,
+.ui-checkbox__box.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.ui-checkbox__box[data-state="checked"],
+.ui-checkbox__box[data-state="indeterminate"] {
+  color: var(--surface);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.ui-checkbox__box[data-disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* loading 时也会带 data-disabled（防重复提交），但这一态要看得见进度，
+ * 所以把透明度收回来、光标改成 progress。 */
+.ui-checkbox__box[data-disabled][aria-busy="true"] {
+  opacity: 1;
+  cursor: progress;
+}
+
+/* ================================================================= Radio */
+
+.ui-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ui-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-size: var(--font-size-body-sm);
+  user-select: none;
+}
+
+.ui-radio__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 55%, var(--border));
+  border-radius: var(--radius-pill);
+  transition: border-color var(--transition-fast) var(--transition-easing);
+}
+
+.ui-radio:hover .ui-radio__dot,
+.ui-radio__dot.force-hover {
+  border-color: var(--primary);
+}
+
+.ui-radio:active .ui-radio__dot,
+.ui-radio__dot.force-active {
+  background: var(--primary-soft);
+}
+
+.ui-radio__dot:focus-visible,
+.ui-radio__dot.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.ui-radio__dot[data-state="checked"] {
+  border-color: var(--primary);
+}
+
+.ui-radio__dot[data-state="checked"]::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: var(--primary);
+  border-radius: var(--radius-pill);
+}
+
+.ui-radio__dot[data-disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ================================================================ Switch */
+
+.ui-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 38px;
+  height: 22px;
+  flex: 0 0 auto;
+  padding: 2px;
+  background: color-mix(in srgb, var(--text-muted) 30%, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background-color var(--transition-fast) var(--transition-easing),
+    border-color var(--transition-fast) var(--transition-easing);
+}
+
+.ui-switch:hover:not(:disabled),
+.ui-switch.force-hover {
+  border-color: var(--primary);
+}
+
+.ui-switch:active:not(:disabled),
+.ui-switch.force-active {
+  background: color-mix(in srgb, var(--text-muted) 42%, var(--bg));
+}
+
+.ui-switch:focus-visible,
+.ui-switch.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.ui-switch[data-state="checked"] {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.ui-switch[data-disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-switch__thumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  transition: transform var(--transition-fast) var(--transition-easing);
+  transform: translateX(0);
+}
+
+.ui-switch[data-state="checked"] .ui-switch__thumb {
+  transform: translateX(16px);
+}
+
+/* ================================================================ Slider */
+
+.ui-slider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 22px;
+  touch-action: none;
+  user-select: none;
+}
+
+.ui-slider__track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 4px;
+  background: color-mix(in srgb, var(--text-muted) 24%, var(--bg));
+  border-radius: var(--radius-pill);
+}
+
+.ui-slider__range {
+  position: absolute;
+  height: 100%;
+  background: var(--primary);
+  border-radius: var(--radius-pill);
+}
+
+.ui-slider__thumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-pill);
+  transition: box-shadow var(--transition-fast) var(--transition-easing);
+  cursor: grab;
+}
+
+.ui-slider__thumb:hover,
+.ui-slider__thumb.force-hover {
+  box-shadow: 0 0 0 4px var(--primary-soft);
+}
+
+.ui-slider__thumb:active,
+.ui-slider__thumb.force-active {
+  cursor: grabbing;
+  box-shadow: 0 0 0 6px var(--primary-soft-hover);
+}
+
+.ui-slider__thumb:focus-visible,
+.ui-slider__thumb.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.ui-slider[data-disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* =================================================================== Tag */
+
+.ui-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 24px;
+  padding: 0 var(--space-2);
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  transition: color var(--transition-fast) var(--transition-easing),
+    background-color var(--transition-fast) var(--transition-easing),
+    border-color var(--transition-fast) var(--transition-easing);
+}
+
+.ui-tag--md {
+  height: 28px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-code);
+}
+
+.ui-tag:hover:not(:disabled),
+.ui-tag.force-hover {
+  color: var(--text);
+  border-color: var(--primary);
+}
+
+.ui-tag:active:not(:disabled),
+.ui-tag.force-active {
+  background: var(--primary-soft);
+}
+
+.ui-tag:focus-visible,
+.ui-tag.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.ui-tag[aria-pressed="true"],
+.ui-tag.is-selected {
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.ui-tag__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-right: -2px;
+  color: inherit;
+  border-radius: var(--radius-pill);
+}
+
+.ui-tag__remove:hover {
+  color: var(--danger);
+}
+
+.ui-tag__remove:active {
+  background: var(--danger-soft);
+}
+
+.ui-tag__remove:focus-visible {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: 1px;
+}
+
+/* ================================================================= Badge */
+
+/* Badge 是纯展示元素（不可点、不可聚焦）：
+ * hover / active / disabled / loading 四态**不适用**——它不接收指针事件也不承载动作。
+ * 需要可点击的徽章用 Tag 或 Button。 */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 20px;
+  padding: 0 var(--space-2);
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ui-badge--md {
+  height: 24px;
+  font-size: var(--font-size-code);
+}
+
+.ui-badge--primary {
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+}
+
+.ui-badge--accent {
+  color: color-mix(in srgb, var(--accent) 82%, var(--text));
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+}
+
+.ui-badge--danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+
+/* =============================================================== Tooltip */
+
+.ui-tooltip__content {
+  z-index: var(--z-toast);
+  max-width: 260px;
+  padding: var(--space-1) var(--space-2);
+  color: var(--surface);
+  background: color-mix(in srgb, var(--text) 92%, var(--surface));
+  border-radius: var(--radius-control);
+  font-size: 12px;
+  line-height: var(--line-height-tight);
+  box-shadow: var(--shadow-1);
+}
+
+.ui-tooltip__arrow {
+  fill: color-mix(in srgb, var(--text) 92%, var(--surface));
+}
+
+/* ================================================================ Avatar */
+
+.ui-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-title);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--weight-title);
+  user-select: none;
+}
+
+.ui-avatar--sm {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+
+.ui-avatar--lg {
+  width: 44px;
+  height: 44px;
+  font-size: var(--font-size-title-sm);
+}
+
+.ui-avatar__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ============================================================= Separator */
+
+.ui-sep {
+  flex: 0 0 auto;
+  background: var(--border);
+}
+
+.ui-sep--horizontal {
+  width: 100%;
+  height: 1px;
+}
+
+.ui-sep--vertical {
+  width: 1px;
+  align-self: stretch;
+  min-height: 16px;
+}
+
+/* ============================================================== Skeleton */
+
+/* Skeleton 是占位块：没有 hover / focus / active / disabled / loading 五态
+ * （它本身就是 loading 的视觉）；只用 shimmer 表达"正在加载"。 */
+.ui-skeleton {
+  display: block;
+  width: 100%;
+  height: 12px;
+  background: color-mix(in srgb, var(--text-muted) 12%, var(--bg));
+  border-radius: var(--radius-control);
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text-muted) 8%, var(--bg)) 0%,
+    color-mix(in srgb, var(--text-muted) 18%, var(--bg)) 50%,
+    color-mix(in srgb, var(--text-muted) 8%, var(--bg)) 100%
+  );
+  background-size: 200% 100%;
+  animation: ui-shimmer 1.4s var(--transition-easing) infinite;
+}
+
+.ui-skeleton--text {
+  height: 14px;
+}
+
+.ui-skeleton--title {
+  height: 20px;
+  width: 60%;
+}
+
+.ui-skeleton--circle {
+  border-radius: var(--radius-pill);
+}
+
+@keyframes ui-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* =============================================================== Spinner */
+
+.ui-spinner {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-top-color: currentColor;
+  border-radius: var(--radius-pill);
+  animation: ui-spin 0.7s linear infinite;
+}
+
+.ui-spinner--sm {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+}
+
+.ui-spinner--lg {
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+}
+
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 加载态文案给读屏用；视觉上不占位 */
+.ui-loading-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* =========================================================== ProgressBar */
+
+.ui-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.ui-progress__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.ui-progress__track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text-muted) 16%, var(--bg));
+  border-radius: var(--radius-pill);
+}
+
+.ui-progress__fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: var(--radius-pill);
+  transition: width var(--transition-fast) var(--transition-easing);
+}
+
+.ui-progress--accent .ui-progress__fill {
+  background: var(--accent);
+}
+
+.ui-progress--danger .ui-progress__fill {
+  background: var(--danger);
+}
+
+/* 不确定进度：条内来回跑（同一档 shimmer 语义，不加新动效类型） */
+.ui-progress--indeterminate .ui-progress__fill {
+  width: 40% !important;
+  animation: ui-progress-slide 1.2s var(--transition-easing) infinite;
+}
+
+@keyframes ui-progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+
+/* =========================================================== ProgressRing */
+
+.ui-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.ui-ring__svg {
+  transform: rotate(-90deg);
+}
+
+.ui-ring__track {
+  stroke: color-mix(in srgb, var(--text-muted) 18%, var(--bg));
+}
+
+.ui-ring__value {
+  stroke: var(--primary);
+  transition: stroke-dashoffset var(--transition-fast) var(--transition-easing);
+}
+
+.ui-ring--accent .ui-ring__value {
+  stroke: var(--accent);
+}
+
+.ui-ring__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-code);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* ============================================================ Pagination */
+
+.ui-pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.ui-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--space-2);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-body-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color var(--transition-fast) var(--transition-easing),
+    color var(--transition-fast) var(--transition-easing),
+    border-color var(--transition-fast) var(--transition-easing);
+}
+
+.ui-page:hover:not(:disabled),
+.ui-page.force-hover {
+  color: var(--text);
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+.ui-page:active:not(:disabled),
+.ui-page.force-active {
+  background: var(--primary-soft);
+}
+
+.ui-page:focus-visible,
+.ui-page.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.ui-page[aria-current="page"] {
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+.ui-page:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ui-page--ellipsis {
+  color: var(--text-muted);
+  cursor: default;
+  letter-spacing: 0.1em;
+}
+
+/* ================================================================== Card */
+
+.ui-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  transition: border-color var(--transition-fast) var(--transition-easing),
+    transform var(--transition-fast) var(--transition-easing),
+    box-shadow var(--transition-fast) var(--transition-easing);
+}
+
+.ui-card--pad {
+  padding: var(--space-4);
+}
+
+.ui-card--hoverable:hover,
+.ui-card--hoverable.force-hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  box-shadow: var(--shadow-1);
+  transform: translateY(-2px);
+}
+
+.ui-card--hoverable:active,
+.ui-card--hoverable.force-active {
+  transform: translateY(0);
+  background: var(--primary-soft);
+}
+
+/* 卡片本身不是焦点目标：只有内部可交互元素（按钮/链接）吃 focus。
+ * 作为可点击卡片使用时传 `as="button"`，那时 focus ring 走全局规则。 */
+.ui-card--hoverable:focus-visible,
+.ui-card--hoverable.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.ui-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) 0;
+}
+
+.ui-card__title {
+  font-family: var(--font-title);
+  font-size: var(--font-size-title-sm);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--letter-spacing-title);
+}
+
+.ui-card__body {
+  padding: var(--space-3) var(--space-4);
+}
+
+.ui-card__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-4);
+  margin-top: auto;
+}
+
+/* ================================================================= Panel */
+
+.ui-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.ui-panel__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.ui-panel__heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ui-panel__title {
+  font-family: var(--font-title);
+  font-size: var(--font-size-title-sm);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--letter-spacing-title);
+}
+
+.ui-panel__desc {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: var(--line-height-tight);
+}
+
+.ui-panel__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+.ui-panel__body {
+  padding: var(--space-4);
+}
+
+.ui-panel__body--flush {
+  padding: 0;
+}
+
+.ui-panel__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+/* ================================================================== Tabs */
+
+.ui-tabs__list {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.ui-tabs__trigger {
+  position: relative;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: var(--font-size-body-sm);
+  cursor: pointer;
+  transition: color var(--transition-fast) var(--transition-easing),
+    border-color var(--transition-fast) var(--transition-easing),
+    background-color var(--transition-fast) var(--transition-easing);
+}
+
+.ui-tabs__trigger:hover,
+.ui-tabs__trigger.force-hover {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.ui-tabs__trigger:active,
+.ui-tabs__trigger.force-active {
+  background: var(--primary-soft);
+}
+
+.ui-tabs__trigger:focus-visible,
+.ui-tabs__trigger.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.ui-tabs__trigger[data-state="active"] {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+
+.ui-tabs__trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-tabs__content {
+  padding-top: var(--space-4);
+}
+
+.ui-tabs__content:focus-visible {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* ============================================================= Accordion */
+
+.ui-accordion {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.ui-accordion__item + .ui-accordion__item {
+  border-top: 1px solid var(--border);
+}
+
+.ui-accordion__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text);
+  background: var(--surface);
+  font-family: var(--font-title);
+  font-size: var(--font-size-title-sm);
+  font-weight: var(--weight-title);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-fast) var(--transition-easing),
+    color var(--transition-fast) var(--transition-easing);
+}
+
+.ui-accordion__trigger:hover,
+.ui-accordion__trigger.force-hover {
+  color: var(--primary);
+  background: var(--bg);
+}
+
+.ui-accordion__trigger:active,
+.ui-accordion__trigger.force-active {
+  background: var(--primary-soft);
+}
+
+.ui-accordion__trigger:focus-visible,
+.ui-accordion__trigger.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.ui-accordion__trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-accordion__chevron {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast) var(--transition-easing);
+}
+
+.ui-accordion__trigger[data-state="open"] .ui-accordion__chevron {
+  transform: rotate(180deg);
+}
+
+.ui-accordion__content {
+  padding: 0 var(--space-4) var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-body);
+}
+
+.ui-accordion__content[data-state="open"] {
+  animation: ui-fade-in var(--transition-fast) var(--transition-easing);
+}
+
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ================================================================ Dialog */
+
+.ui-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  background: var(--scrim);
+  animation: ui-fade-in var(--transition-fast) var(--transition-easing);
+}
+
+.ui-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: var(--z-dialog);
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - var(--space-8)));
+  max-height: calc(100vh - var(--space-12));
+  transform: translate(-50%, -50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+}
+
+.ui-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.ui-dialog__heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ui-dialog__title {
+  font-family: var(--font-title);
+  font-size: var(--font-size-title);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--letter-spacing-title);
+}
+
+.ui-dialog__desc {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--font-size-body-sm);
+}
+
+.ui-dialog__body {
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.ui-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+/* ================================================================= Sheet */
+
+.ui-sheet {
+  position: fixed;
+  z-index: var(--z-dialog);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
+}
+
+.ui-sheet--right,
+.ui-sheet--left {
+  top: 0;
+  bottom: 0;
+  width: min(360px, 92vw);
+}
+
+.ui-sheet--right {
+  right: 0;
+  border-radius: var(--radius-card) 0 0 var(--radius-card);
+}
+
+.ui-sheet--left {
+  left: 0;
+  border-radius: 0 var(--radius-card) var(--radius-card) 0;
+}
+
+.ui-sheet--bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 88vh;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+}
+
+.ui-sheet__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.ui-sheet__title {
+  flex: 1 1 auto;
+  font-family: var(--font-title);
+  font-size: var(--font-size-title-sm);
+  font-weight: var(--weight-title);
+}
+
+.ui-sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+/* ========================================================== DropdownMenu */
+
+.ui-menu__content {
+  z-index: var(--z-dropdown);
+  min-width: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+}
+
+.ui-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  color: var(--text);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-body-sm);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+
+.ui-menu__item[data-highlighted],
+.ui-menu__item:hover,
+.ui-menu__item.force-hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.ui-menu__item:active,
+.ui-menu__item.force-active {
+  background: var(--primary-soft-hover);
+}
+
+.ui-menu__item:focus-visible,
+.ui-menu__item.force-focus {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.ui-menu__item[data-disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-menu__item--danger {
+  color: var(--danger);
+}
+
+.ui-menu__item--danger[data-highlighted],
+.ui-menu__item--danger:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.ui-menu__label {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.ui-menu__separator {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--border);
+}
+
+.ui-menu__check {
+  margin-left: auto;
+  color: var(--primary);
+}
+
+/* ================================================================= Popover */
+
+.ui-popover__content {
+  z-index: var(--z-dropdown);
+  min-width: 200px;
+  max-width: min(360px, calc(100vw - var(--space-8)));
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+  font-size: var(--font-size-body-sm);
+}
+
+.ui-popover__arrow {
+  fill: var(--surface);
+  stroke: var(--border);
+}
+
+/* ================================================================= Toast */
+
+/* 位置由 layout 的 `.toast-host` 负责，这里只画单条。
+ * Toast 的"disabled / active"不适用：它不可聚焦、不可点（只有关闭按钮可点）。 */
+.ui-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+  animation: ui-toast-in var(--transition-fast) var(--transition-easing);
+}
+
+@keyframes ui-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ui-toast--success {
+  border-left-color: var(--primary);
+}
+
+.ui-toast--info {
+  border-left-color: color-mix(in srgb, var(--text-muted) 70%, var(--border));
+}
+
+.ui-toast--warn {
+  border-left-color: var(--accent);
+}
+
+.ui-toast--error {
+  border-left-color: var(--danger);
+}
+
+.ui-toast__icon {
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+
+.ui-toast--success .ui-toast__icon {
+  color: var(--primary);
+}
+
+.ui-toast--info .ui-toast__icon {
+  color: var(--text-muted);
+}
+
+.ui-toast--warn .ui-toast__icon {
+  color: var(--accent);
+}
+
+.ui-toast--error .ui-toast__icon {
+  color: var(--danger);
+}
+
+.ui-toast__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ui-toast__message {
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-tight);
+}
+
+.ui-toast__hint {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: var(--line-height-tight);
+}
+
+.ui-toast__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: -2px -4px 0 0;
+  color: var(--text-muted);
+  border-radius: var(--radius-control);
+  transition: color var(--transition-fast) var(--transition-easing),
+    background-color var(--transition-fast) var(--transition-easing);
+}
+
+.ui-toast__close:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.ui-toast__close:active {
+  background: var(--primary-soft);
+}
+
+.ui-toast__close:focus-visible {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Toast 的静态预览容器（画廊用；生产由 layout 的 .toast-host 定位） */
+.ui-toast-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 360px;
+}
+
+/* ===================================================== 浮层进出场降级 */
+
+/* Radix 的 data-state 动画：只做淡入 + 2px 位移（§9.2 第 4 条） */
+.ui-overlay[data-state="open"],
+.ui-dialog[data-state="open"],
+.ui-sheet[data-state="open"],
+.ui-menu__content[data-state="open"],
+.ui-popover__content[data-state="open"],
+.ui-select__content[data-state="open"] {
+  animation: ui-fade-in var(--transition-fast) var(--transition-easing);
+}
+
+/* =============================================== 画廊强制态（作用域版） */
+
+/*
+ * 有些组件的交互节点在内部（Radix 的 Root/Trigger、包装 div），外层传进来的
+ * className 到不了那个节点，只靠"元素自己带 force-* 类"演示不了五态。
+ * 这一段给**祖先加类**的写法：`.force-hover .ui-checkbox__box { … }`。
+ *
+ * 只服务于 dev 组件画廊（`frontend/gallery.html`）的截图；生产代码不会加这些类。
+ * 它不新增任何视觉规则，只是把上面各组件的 `:hover` / `:active` / `:focus-visible`
+ * 分支换个选择器再说一遍，所以两边不会漂移。
+ */
+.force-hover .ui-input:not(:disabled),
+.force-hover .ui-textarea:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+}
+
+.force-focus .ui-input,
+.force-focus .ui-textarea {
+  border-color: var(--primary);
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.force-active .ui-input:not(:disabled),
+.force-active .ui-textarea:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 70%, var(--border));
+}
+
+.force-hover .ui-checkbox__box {
+  border-color: var(--primary);
+}
+
+.force-active .ui-checkbox__box {
+  background: var(--primary-soft);
+}
+
+.force-focus .ui-checkbox__box,
+.force-focus .ui-radio__dot {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.force-hover .ui-radio__dot {
+  border-color: var(--primary);
+}
+
+.force-active .ui-radio__dot {
+  background: var(--primary-soft);
+}
+
+.force-hover .ui-switch:not([data-state="checked"]) {
+  border-color: var(--primary);
+}
+
+.force-active .ui-switch:not([data-state="checked"]) {
+  background: color-mix(in srgb, var(--text-muted) 42%, var(--bg));
+}
+
+.force-focus .ui-switch {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.force-hover .ui-slider__thumb {
+  box-shadow: 0 0 0 4px var(--primary-soft);
+}
+
+.force-active .ui-slider__thumb {
+  box-shadow: 0 0 0 6px var(--primary-soft-hover);
+}
+
+.force-focus .ui-slider__thumb {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.force-hover .ui-select__trigger {
+  border-color: var(--primary);
+}
+
+.force-active .ui-select__trigger {
+  background: var(--primary-soft);
+}
+
+.force-focus .ui-select__trigger {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.force-hover .ui-tabs__trigger,
+.force-hover .ui-accordion__trigger {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.force-active .ui-tabs__trigger,
+.force-active .ui-accordion__trigger {
+  background: var(--primary-soft);
+}
+
+.force-focus .ui-tabs__trigger,
+.force-focus .ui-accordion__trigger {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.force-hover .ui-menu__item,
+.force-hover .ui-combobox__option {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.force-active .ui-menu__item,
+.force-active .ui-combobox__option {
+  background: var(--primary-soft-hover);
+}
+
+.force-focus .ui-menu__item {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.force-hover .ui-tag:not([aria-pressed="true"]) {
+  color: var(--text);
+  border-color: var(--primary);
+}
+
+.force-active .ui-tag:not([aria-pressed="true"]) {
+  background: var(--primary-soft);
+}
+
+.force-focus .ui-tag {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.force-hover .ui-card--hoverable {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  box-shadow: var(--shadow-1);
+  transform: translateY(-2px);
+}
+
+.force-active .ui-card--hoverable {
+  transform: translateY(0);
+  background: var(--primary-soft);
+}

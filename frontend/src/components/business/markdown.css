@@ -1,0 +1,349 @@
+/*
+ * MarkdownView 排版（需求文档 §9.2 第 2 条「不出现裸 Markdown」+ §9.3）。
+ *
+ * 铁律同前：零色值字面量，只用 tokens 变量 / color-mix。
+ * 代码高亮（highlight.js 的 class）也在这里上色，**不引第三方主题 CSS**
+ * （第三方主题会带十六进制色值，且与 tokens 的色相不一致）。
+ */
+
+.md {
+  max-width: var(--prose-width);
+  color: var(--text);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  word-wrap: break-word;
+}
+
+/* 顶栏是 sticky 56px：锚点跳转要给顶栏留位（§9.5 右侧目录点击后标题不能被盖住） */
+.md :is(h1, h2, h3, h4, h5, h6) {
+  scroll-margin-top: calc(var(--topbar-height) + var(--space-4));
+}
+
+.md > :first-child {
+  margin-top: 0;
+}
+
+/* 标题层级：h1 只用于正文大标题，h2 带下细线，h3/h4 递减 --------------- */
+.md h1 {
+  margin: var(--space-8) 0 var(--space-4);
+  font-size: var(--font-size-title-lg);
+}
+
+.md h2 {
+  margin: var(--space-8) 0 var(--space-3);
+  padding-bottom: var(--space-2);
+  font-size: var(--font-size-title);
+  border-bottom: 1px solid var(--border);
+}
+
+.md h3 {
+  margin: var(--space-6) 0 var(--space-2);
+  font-size: var(--font-size-title-sm);
+}
+
+.md h4,
+.md h5,
+.md h6 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--font-size-body);
+  font-weight: var(--weight-title);
+}
+
+.md p {
+  margin: var(--space-3) 0;
+}
+
+.md a {
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+.md a:hover {
+  text-decoration: none;
+  border-bottom-color: var(--primary);
+}
+
+.md a:focus-visible {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-control);
+}
+
+/* 外链图标：跟在文字后面的小箭头，不参与换行断词 */
+.md__external-icon {
+  display: inline-block;
+  margin-left: 2px;
+  vertical-align: -2px;
+  color: var(--text-muted);
+  border: 0;
+}
+
+.md ul,
+.md ol {
+  margin: var(--space-3) 0;
+  padding-left: var(--space-6);
+  list-style: revert;
+}
+
+.md li {
+  margin: var(--space-1) 0;
+}
+
+.md li > ul,
+.md li > ol {
+  margin: var(--space-1) 0;
+}
+
+.md blockquote {
+  margin: var(--space-4) 0;
+  padding: var(--space-1) var(--space-4);
+  color: var(--text-muted);
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+}
+
+.md blockquote > :first-child {
+  margin-top: var(--space-2);
+}
+
+.md blockquote > :last-child {
+  margin-bottom: var(--space-2);
+}
+
+/* 表格：GFM --------------------------------------------------------- */
+.md table {
+  width: 100%;
+  margin: var(--space-4) 0;
+  border-collapse: collapse;
+  font-size: var(--font-size-body-sm);
+}
+
+.md th,
+.md td {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.md th {
+  background: var(--bg);
+  font-weight: 600;
+}
+
+/* 分隔线 / 图片 / 任务列表 ------------------------------------------ */
+.md hr {
+  height: 1px;
+  margin: var(--space-8) 0;
+  background: var(--border);
+  border: 0;
+}
+
+.md img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+}
+
+.md__image-button {
+  display: inline-block;
+  max-width: 100%;
+  margin: var(--space-3) 0;
+  padding: 0;
+  border-radius: var(--radius-card);
+  cursor: zoom-in;
+}
+
+.md__image-button:hover img {
+  border-color: var(--primary);
+}
+
+.md__image-button:active img {
+  opacity: 0.92;
+}
+
+.md__image-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.md li.task-list-item {
+  list-style: none;
+  margin-left: calc(-1 * var(--space-4));
+}
+
+/* GFM 任务列表的勾选框：内容里的原生 checkbox 也自绘，
+ * 避免"裸控件"观感（§9.4）；它是 disabled 的纯展示，不接收交互。 */
+.md input[type="checkbox"] {
+  position: relative;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin: 0 var(--space-2) 0 0;
+  vertical-align: -2px;
+  appearance: none;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 55%, var(--border));
+  border-radius: 3px;
+}
+
+.md input[type="checkbox"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.md input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  inset: -1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--surface);
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* 行内代码 ---------------------------------------------------------- */
+.md :not(pre) > code {
+  padding: 1px var(--space-1);
+  color: color-mix(in srgb, var(--primary) 88%, var(--text));
+  background: var(--primary-soft);
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+  border-radius: 4px;
+  font-size: var(--font-size-code);
+  word-break: break-word;
+}
+
+/* 代码块：语言标签 + 复制按钮在头，代码本体可横向滚动 ------------- */
+.md-code {
+  margin: var(--space-4) 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.md-code__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.md-code__lang {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+.md-code__copy {
+  margin-left: auto;
+}
+
+.md-code__pre {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-code);
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.md-code__pre code {
+  font-family: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+/* 灯箱（图片放大） ------------------------------------------------- */
+.md-lightbox__image {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - var(--space-16));
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: var(--radius-control);
+}
+
+/* highlight.js 主题：只用 tokens 里的色相 -------------------------- */
+.md-code__pre .hljs-comment,
+.md-code__pre .hljs-quote {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.md-code__pre .hljs-keyword,
+.md-code__pre .hljs-selector-tag,
+.md-code__pre .hljs-literal,
+.md-code__pre .hljs-type {
+  color: color-mix(in srgb, var(--primary) 92%, var(--text));
+  font-weight: 600;
+}
+
+.md-code__pre .hljs-string,
+.md-code__pre .hljs-regexp,
+.md-code__pre .hljs-addition,
+.md-code__pre .hljs-attribute {
+  color: color-mix(in srgb, var(--accent) 78%, var(--text));
+}
+
+.md-code__pre .hljs-number,
+.md-code__pre .hljs-symbol,
+.md-code__pre .hljs-bullet {
+  color: color-mix(in srgb, var(--accent) 62%, var(--danger));
+}
+
+.md-code__pre .hljs-title,
+.md-code__pre .hljs-section,
+.md-code__pre .hljs-title.function_ {
+  color: color-mix(in srgb, var(--primary) 70%, var(--text));
+  font-weight: 600;
+}
+
+.md-code__pre .hljs-variable,
+.md-code__pre .hljs-template-variable,
+.md-code__pre .hljs-params,
+.md-code__pre .hljs-property {
+  color: var(--text);
+}
+
+.md-code__pre .hljs-built_in,
+.md-code__pre .hljs-meta {
+  color: color-mix(in srgb, var(--danger) 82%, var(--text));
+}
+
+.md-code__pre .hljs-deletion {
+  color: var(--danger);
+}
+
+.md-code__pre .hljs-emphasis {
+  font-style: italic;
+}
+
+.md-code__pre .hljs-strong {
+  font-weight: 600;
+}
+
+/* 窄屏：正文不再受限，表格/代码可横向滚动 -------------------------- */
+@media (max-width: 767px) {
+  .md {
+    font-size: var(--font-size-body-sm);
+  }
+
+  .md h1 {
+    font-size: var(--font-size-title);
+  }
+
+  .md h2 {
+    font-size: var(--font-size-title-sm);
+  }
+}

@@ -1,14 +1,17 @@
 /**
- * CommandPalette 挂载点（Owner：前端骨架 M0）。
+ * CommandPalette 挂载点（Owner：前端骨架 M0；M2 组件库接入真实面板）。
  *
- * **只做三件事**：Ctrl/⌘+K 打开、Esc 关闭、焦点进出管理（§9.7）。
- * 真正的命令面板（搜索框、结果分组、键盘上下选择）由组件库 M2 的
- * `components/business/CommandPalette.tsx` 实现，接进这里替换 `palette__body`。
+ * 这个文件只做**一件事**：把布局层传下来的 `open` / `onClose` 交给组件库的
+ * `components/business/CommandPalette`。
+ *
+ * 为什么保留这一层而不是让 AppShell 直接引业务组件：
+ * - Ctrl/⌘+K 的绑定在 `AppShell`（`useHotkeys`），布局层是唯一的打开入口；
+ * - 保持 M0 的装配点不变，后续要换成"资料页自己的搜索"时只改这一处或换 props。
+ *
+ * 焦点锁定 / Esc 关闭 / 关闭后焦点回到触发元素由 `ui/Dialog`（Radix Dialog）提供，
+ * 见 `components/ui/Dialog.tsx` 的文件头。
  */
-import { Search } from "lucide-react";
-import { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
-import { useTranslation } from "react-i18next";
+import { CommandPalette as BusinessCommandPalette } from "@/components/business/CommandPalette";
 
 export interface CommandPaletteProps {
   open: boolean;
@@ -16,54 +19,5 @@ export interface CommandPaletteProps {
 }
 
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
-  const { t } = useTranslation(["common", "nav"]);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    restoreFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    panelRef.current?.focus();
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      restoreFocusRef.current?.focus();
-    };
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  return createPortal(
-    <div
-      className="palette-overlay"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        ref={panelRef}
-        className="palette"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("nav:openSearch")}
-        tabIndex={-1}
-      >
-        <div className="palette__head">
-          <Search size={15} aria-hidden="true" />
-          <span>{t("palette.placeholder")}</span>
-          <span style={{ marginLeft: "auto" }}>{t("palette.hint")}</span>
-        </div>
-        <div className="palette__body">{t("palette.empty")}</div>
-      </div>
-    </div>,
-    document.body,
-  );
+  return <BusinessCommandPalette open={open} onClose={onClose} />;
 }
