@@ -1,0 +1,120 @@
+{
+  "title": "Assistant",
+  "subtitle": "Find resources, get study advice, draft and adjust study plans — within this library only.",
+  "thread": {
+    "label": "Conversation"
+  },
+  "boundary": {
+    "text": "I only cover resource search, study advice and study plans. Writing or debugging code, translation and general knowledge are out of scope.",
+    "dismiss": "Dismiss the scope notice"
+  },
+  "guide": {
+    "title": "No model configured yet",
+    "body": "Greetings, searching and refusals cost no tokens and already work. Drafting plans and giving advice need base_url / api_key / model on the settings page.",
+    "action": "Open settings"
+  },
+  "tokens": {
+    "label": "About {{tokens}} tokens this session",
+    "warn": "This session is getting expensive"
+  },
+  "empty": {
+    "title": "Try one of these",
+    "note": "Picking a card fills the prompt into the box so you can edit it first.",
+    "examples": {
+      "plan": {
+        "label": "Draft a plan",
+        "prompt": "Make me a 12-week frontend plan at 10 hours a week",
+        "hint": "Routed to plan drafting; returns a savable draft"
+      },
+      "search": {
+        "label": "Find resources",
+        "prompt": "Any articles on closures?",
+        "hint": "Routed to search; returns in-library result cards"
+      },
+      "advice": {
+        "label": "Ask for advice",
+        "prompt": "I'm a complete beginner — what should I learn first for frontend?",
+        "hint": "Routed to advice; answers citing in-library resources"
+      },
+      "refusal": {
+        "label": "Out of scope",
+        "prompt": "Write me a quicksort",
+        "hint": "Routed to refusal; fixed wording plus a better question"
+      }
+    }
+  },
+  "intent": {
+    "prefix": "Detected",
+    "hint": "The intent is decided on the server (rules first, then the model); it cannot be corrected from this page yet",
+    "labels": {
+      "GREETING": "greeting",
+      "CAPABILITY": "capabilities",
+      "RESOURCE_SEARCH": "resource search",
+      "PLAN_CREATE": "plan drafting",
+      "PLAN_ADJUST": "plan adjustment",
+      "ADVICE": "study advice",
+      "CLARIFY": "clarification",
+      "OUT_OF_SCOPE": "out of scope"
+    },
+    "source": {
+      "rule": "rule",
+      "llm": "model",
+      "fallback": "fallback"
+    }
+  },
+  "bubble": {
+    "assistantName": "Assistant",
+    "thinking": "Thinking…",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Copy failed",
+    "aborted": "Stopped — this answer is incomplete",
+    "truncated": "The answer hit the length limit and was truncated"
+  },
+  "composer": {
+    "label": "Type your question",
+    "placeholder": "Ask something, e.g. \"Any articles on closures?\"",
+    "hint": "Enter sends, Shift+Enter adds a line; over 500 characters is truncated",
+    "send": "Send",
+    "abort": "Stop",
+    "cooldown": "Wait {{seconds}}s",
+    "waitSend": "Wait {{seconds}}s",
+    "truncate": "{{count}} characters over — sending truncates to 500"
+  },
+  "search": {
+    "head": "{{total}} resources matched \"{{query}}\"",
+    "took": "{{ms}} ms",
+    "note": "Pick one to open it; results come from the in-library full-text index.",
+    "empty": "Nothing in the library matches \"{{query}}\"",
+    "emptyNote": "Try another wording, or browse the library by stack."
+  },
+  "clarify": {
+    "hint": "Pick one to fill the prompt, then press Send."
+  },
+  "plan": {
+    "meta": "{{weeks}} weeks · {{hours}} h/week · {{stages}} stages · {{items}} items · about {{minutes}} minutes",
+    "weeks": "{{weeks}} wk",
+    "minutes": "{{minutes}} min",
+    "more": "{{count}} more not shown",
+    "save": "Save as plan",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "preview": "Preview and edit",
+    "note": "Saving writes to the database and makes it the active plan; use \"Preview and edit\" to change stages first.",
+    "retry": "Try saving again"
+  },
+  "level": {
+    "beginner": "Beginner",
+    "intermediate": "Intermediate",
+    "advanced": "Advanced"
+  },
+  "error": {
+    "title": "That didn't work",
+    "retry": "Retry",
+    "copy": "Copy error details",
+    "copied": "Copied",
+    "settings": "Open settings",
+    "wait": "Wait {{seconds}}s before retrying",
+    "networkHint": "Check that the local service is still running; the answer may be cut off — retrying asks again"
+  }
+}

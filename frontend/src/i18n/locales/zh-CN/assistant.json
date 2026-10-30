@@ -1,0 +1,120 @@
+{
+  "title": "助手",
+  "subtitle": "找资料、给学习建议、生成与调整学习计划 —— 只在这个学习库的范围内。",
+  "thread": {
+    "label": "对话记录"
+  },
+  "boundary": {
+    "text": "我只负责资料检索、学习建议和学习计划；写代码、调试、翻译和站外知识问答不在范围内。",
+    "dismiss": "关闭能力边界提示"
+  },
+  "guide": {
+    "title": "还没有配置模型",
+    "body": "问候、找资料和越界拒绝不花 token，现在就能用；生成计划和给学习建议需要先在设置页填 base_url / api_key / model。",
+    "action": "去设置"
+  },
+  "tokens": {
+    "label": "本次会话约 {{tokens}} tokens",
+    "warn": "本次会话消耗较大"
+  },
+  "empty": {
+    "title": "试试这样问",
+    "note": "点一张卡片会把问题填进输入框，你可以改完再发。",
+    "examples": {
+      "plan": {
+        "label": "生成计划",
+        "prompt": "帮我制定一个 12 周、每周 10 小时的前端学习计划",
+        "hint": "识别为生成学习计划，会给出可保存的草稿"
+      },
+      "search": {
+        "label": "找资料",
+        "prompt": "有没有讲闭包的资料",
+        "hint": "识别为检索，直接给站内结果卡片"
+      },
+      "advice": {
+        "label": "问建议",
+        "prompt": "我是零基础，前端应该先学什么",
+        "hint": "识别为学习建议，会引用站内资料回答"
+      },
+      "refusal": {
+        "label": "越界示例",
+        "prompt": "帮我写个快排的代码",
+        "hint": "识别为越界，用固定话术拒绝并给替代问法"
+      }
+    }
+  },
+  "intent": {
+    "prefix": "识别为",
+    "hint": "意图由服务端判定（规则优先，然后是模型），这一版不支持在页面上改正",
+    "labels": {
+      "GREETING": "问候",
+      "CAPABILITY": "能力范围",
+      "RESOURCE_SEARCH": "找资料",
+      "PLAN_CREATE": "生成学习计划",
+      "PLAN_ADJUST": "调整学习计划",
+      "ADVICE": "学习建议",
+      "CLARIFY": "需要澄清",
+      "OUT_OF_SCOPE": "越界请求"
+    },
+    "source": {
+      "rule": "规则命中",
+      "llm": "模型判定",
+      "fallback": "兜底"
+    }
+  },
+  "bubble": {
+    "assistantName": "助手",
+    "thinking": "正在思考…",
+    "copy": "复制",
+    "copied": "已复制",
+    "copyFailed": "复制失败",
+    "aborted": "已中止，这一轮的回答不完整",
+    "truncated": "回答达到长度上限，被截断了"
+  },
+  "composer": {
+    "label": "输入你的问题",
+    "placeholder": "问点什么，例如「有没有讲闭包的资料」",
+    "hint": "Enter 发送，Shift+Enter 换行；超过 500 字会按前 500 字发送",
+    "send": "发送",
+    "abort": "中止",
+    "cooldown": "请等 {{seconds}} 秒",
+    "waitSend": "等 {{seconds}} 秒",
+    "truncate": "超出 {{count}} 字，发送时截断到 500 字"
+  },
+  "search": {
+    "head": "找到 {{total}} 条与「{{query}}」相关的资料",
+    "took": "用时 {{ms}} ms",
+    "note": "点一条进资料详情；结果来自站内全文检索。",
+    "empty": "站内没有和「{{query}}」匹配的资料",
+    "emptyNote": "换个说法再问，或者去资料库按技术栈浏览。"
+  },
+  "clarify": {
+    "hint": "点一项填入输入框，再按发送即可。"
+  },
+  "plan": {
+    "meta": "{{weeks}} 周 · 每周 {{hours}} 小时 · {{stages}} 个阶段 · {{items}} 个条目 · 约 {{minutes}} 分钟",
+    "weeks": "{{weeks}} 周",
+    "minutes": "{{minutes}} 分钟",
+    "more": "还有 {{count}} 条未展开",
+    "save": "保存为计划",
+    "saving": "保存中…",
+    "saved": "已保存",
+    "preview": "去预览编辑",
+    "note": "保存会直接写库并设为进行中；想先改阶段/条目就点「去预览编辑」。",
+    "retry": "再保存一次"
+  },
+  "level": {
+    "beginner": "入门",
+    "intermediate": "进阶",
+    "advanced": "高级"
+  },
+  "error": {
+    "title": "这次没成功",
+    "retry": "重试",
+    "copy": "复制错误详情",
+    "copied": "已复制",
+    "settings": "去设置",
+    "wait": "请等 {{seconds}} 秒再试",
+    "networkHint": "确认本地服务还在运行；回答可能已经中断，重试会重新问一遍"
+  }
+}

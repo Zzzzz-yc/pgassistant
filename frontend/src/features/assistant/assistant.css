@@ -1,0 +1,618 @@
+/*
+ * 助手页样式（Owner：助手模块 M4）。
+ *
+ * 版式：整页吃掉可用高度 → 头部（标题 / token 累计）→ 提示条 → 可滚动消息区 → 输入区。
+ * 为什么用 `calc(100vh - 顶栏 - 内容区内边距)`：`.app-main` 是滚动容器（styles/layout.css），
+ * 对话页要让"消息滚动、输入区固定"，只能自己算一次可用高度；`min-height` 兜住矮窗口。
+ *
+ * 铁律：零色值字面量，只用 tokens.css 的变量（§9.3 / MODULES §1.2）。
+ * 窄屏：≤767px 时布局收成一列、卡片内边距收紧，375 下不产生横向滚动（§9.8）。
+ */
+
+.asst {
+  /* 与 .app-main 的上下 padding 对齐（见下面的媒体查询） */
+  --asst-pad-block: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: none;
+  min-width: 0;
+  height: calc(100vh - var(--topbar-height) - 2 * var(--asst-pad-block));
+  min-height: 420px;
+  overflow-x: clip;
+}
+
+/* --------------------------------------------------------------- 头部 */
+
+.asst__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  flex: 0 0 auto;
+}
+
+.asst__intro {
+  min-width: 0;
+}
+
+.asst__title {
+  margin-bottom: 2px;
+  font-size: var(--font-size-title);
+}
+
+.asst__subtitle {
+  color: var(--text-muted);
+  font-size: var(--font-size-body-sm);
+  overflow-wrap: anywhere;
+}
+
+/* 会话 token 累计（§7.10） */
+.asst-tokens {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 2px var(--space-3);
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+}
+
+.asst-tokens--warn {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--surface));
+}
+
+.asst-tokens__warn {
+  color: var(--accent);
+  font-weight: var(--weight-title);
+}
+
+/* --------------------------------------------------- 能力边界提示条（可关闭） */
+
+.asst-boundary {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-card);
+  font-size: var(--font-size-body-sm);
+}
+
+.asst-boundary__icon {
+  color: var(--accent);
+  line-height: 0;
+  padding-top: 2px;
+}
+
+.asst-boundary__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------ 模型未配置 */
+
+.asst-guide {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-4);
+  background: var(--primary-soft);
+  border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--surface));
+  border-radius: var(--radius-card);
+}
+
+.asst-guide__icon {
+  color: var(--primary);
+  line-height: 0;
+}
+
+.asst-guide__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.asst-guide__title {
+  color: var(--text);
+  font-weight: var(--weight-title);
+  font-size: var(--font-size-body-sm);
+}
+
+.asst-guide__text {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------- 消息区 */
+
+.asst__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: var(--space-1);
+}
+
+.asst__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-2);
+}
+
+.asst__list-item {
+  min-width: 0;
+}
+
+.asst-user-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.asst-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------- 空状态 */
+
+.asst-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+}
+
+.asst-empty__title {
+  font-size: var(--font-size-title-sm);
+}
+
+.asst-empty__note {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--font-size-body-sm);
+  overflow-wrap: anywhere;
+}
+
+.asst-examples {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.asst-example {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  transition: border-color var(--transition-fast) var(--transition-easing),
+    transform var(--transition-fast) var(--transition-easing),
+    background-color var(--transition-fast) var(--transition-easing);
+}
+
+.asst-example:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.asst-example:active {
+  transform: none;
+  background: var(--primary-soft);
+}
+
+.asst-example__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text);
+  font-weight: var(--weight-title);
+  font-size: var(--font-size-body-sm);
+}
+
+.asst-example__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: var(--radius-control);
+}
+
+/* 越界示例：用琥珀色提醒"这是会被拒绝的问法" */
+.asst-example--refusal .asst-example__icon {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.asst-example__prompt {
+  color: var(--text);
+  font-size: var(--font-size-body-sm);
+  overflow-wrap: anywhere;
+}
+
+.asst-example__hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------- 输入区 */
+
+.asst__composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+}
+
+.asst__composer .ui-textarea {
+  min-height: 56px;
+  max-height: 180px;
+}
+
+.asst__composer-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.asst__hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.asst__cooldown {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.asst__overlimit {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+/* --------------------------------------------------- 检索结果（search） */
+
+.asst-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.asst-search__head {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.asst-search__took {
+  margin-left: var(--space-2);
+  color: var(--text-muted);
+}
+
+.asst-search__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.asst-search__item {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg);
+  transition: border-color var(--transition-fast) var(--transition-easing);
+}
+
+.asst-search__item:hover,
+.asst-search__item:focus-within {
+  border-color: var(--primary);
+}
+
+.asst-search__link {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text);
+  border-radius: var(--radius-control);
+}
+
+.asst-search__link:hover {
+  text-decoration: none;
+  background: var(--primary-soft);
+}
+
+.asst-search__title {
+  font-weight: var(--weight-title);
+  font-size: var(--font-size-body-sm);
+  overflow-wrap: anywhere;
+}
+
+.asst-search__snippet {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.asst-search__snippet mark {
+  padding: 0 1px;
+  color: var(--text);
+  background: var(--accent-soft);
+  border-radius: 2px;
+}
+
+.asst-search__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.asst-search__path {
+  overflow-wrap: anywhere;
+}
+
+.asst-search__note {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------- 澄清选项（clarify） */
+
+.asst-clarify {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.asst-clarify__hint {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.asst-clarify__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.asst-clarify__option {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text);
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-body-sm);
+  overflow-wrap: anywhere;
+  transition: border-color var(--transition-fast) var(--transition-easing),
+    background-color var(--transition-fast) var(--transition-easing);
+}
+
+.asst-clarify__option:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.asst-clarify__option:active {
+  background: var(--primary-soft-hover);
+}
+
+/* ------------------------------------------------ 计划草稿（plan_draft） */
+
+.asst-plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.asst-plan__title {
+  color: var(--text);
+  font-family: var(--font-title);
+  font-size: var(--font-size-title-sm);
+  font-weight: var(--weight-title);
+  overflow-wrap: anywhere;
+}
+
+.asst-plan__goal {
+  color: var(--text-muted);
+  font-size: var(--font-size-body-sm);
+  overflow-wrap: anywhere;
+}
+
+.asst-plan__meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.asst-plan__stages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.asst-plan__stage {
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.asst-plan__stage-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--weight-title);
+}
+
+.asst-plan__index {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+}
+
+.asst-plan__stage-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.asst-plan__weeks {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.asst-plan__items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-1);
+}
+
+.asst-plan__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.asst-plan__item-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.asst-plan__item-meta {
+  flex: 0 0 auto;
+}
+
+.asst-plan__more {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.asst-plan__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.asst-plan__note {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------- 错误卡片 */
+
+.asst-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.asst-error__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ------------------------------------------------------------- 响应式 */
+
+@media (max-width: 1023px) {
+  .asst {
+    --asst-pad-block: var(--space-6);
+  }
+}
+
+@media (max-width: 767px) {
+  .asst {
+    gap: var(--space-2);
+  }
+
+  .asst__head {
+    align-items: flex-start;
+  }
+
+  .asst-examples {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .asst-example {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .asst-guide {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .asst__composer {
+    padding: var(--space-2);
+  }
+
+  /* 375 下 hint 与按钮同占一行会挤：按钮靠右、hint 独占一行 */
+  .asst__hint {
+    flex: 1 1 100%;
+  }
+
+  .asst__composer-row > .ui-btn {
+    margin-left: auto;
+  }
+}
