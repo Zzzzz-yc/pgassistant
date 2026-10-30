@@ -1,0 +1,423 @@
+{
+  "version": 1,
+  "rules": {
+    "only_summary": "只取标题 + 摘要 + 前 5 段要点 + 速查表 + 原文链接",
+    "max_body_chars": 3000,
+    "fetch_interval_sec": 0.4
+  },
+  "batches": {
+    "base": [
+      {
+        "slug": "web-getting-started",
+        "title": "Web 入门：网站是怎么跑起来的",
+        "url": "https://developer.mozilla.org/zh-CN/docs/Learn/Getting_started_with_the_web",
+        "stack": "frontend",
+        "category": "html-css",
+        "author": "MDN",
+        "license": "CC-BY-SA-4.0",
+        "tags": [
+          "前端",
+          "入门"
+        ]
+      },
+      {
+        "slug": "html-basics",
+        "title": "HTML 基础：给内容搭骨架",
+        "url": "https://developer.mozilla.org/zh-CN/docs/Learn/Getting_started_with_the_web/HTML_basics",
+        "stack": "frontend",
+        "category": "html-css",
+        "author": "MDN",
+        "license": "CC-BY-SA-4.0",
+        "tags": [
+          "前端",
+          "HTML"
+        ]
+      },
+      {
+        "slug": "css-first-steps",
+        "title": "CSS 第一步：排版与配色",
+        "url": "https://developer.mozilla.org/zh-CN/docs/Learn/Getting_started_with_the_web/CSS_basics",
+        "stack": "frontend",
+        "category": "html-css",
+        "author": "MDN",
+        "license": "CC-BY-SA-4.0",
+        "tags": [
+          "前端",
+          "CSS"
+        ]
+      },
+      {
+        "slug": "js-first-steps",
+        "title": "JavaScript 第一步：让页面动起来",
+        "url": "https://developer.mozilla.org/zh-CN/docs/Learn/Getting_started_with_the_web/JavaScript_basics",
+        "stack": "frontend",
+        "category": "javascript",
+        "author": "MDN",
+        "license": "CC-BY-SA-4.0",
+        "tags": [
+          "前端",
+          "JavaScript"
+        ]
+      },
+      {
+        "slug": "js-grammar",
+        "title": "JavaScript 语法与数据类型",
+        "url": "https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide/Grammar_and_types",
+        "stack": "frontend",
+        "category": "javascript",
+        "author": "MDN",
+        "license": "CC-BY-SA-4.0",
+        "tags": [
+          "前端",
+          "JavaScript"
+        ]
+      },
+      {
+        "slug": "git-intro",
+        "title": "Git 入门：版本控制第一课",
+        "url": "https://www.runoob.com/git/git-tutorial.html",
+        "stack": "frontend",
+        "category": "tooling",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "工具",
+          "Git"
+        ]
+      },
+      {
+        "slug": "http-overview",
+        "title": "HTTP 概述：请求与响应",
+        "url": "https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Overview",
+        "stack": "backend",
+        "category": "http",
+        "author": "MDN",
+        "license": "CC-BY-SA-4.0",
+        "tags": [
+          "后端",
+          "HTTP"
+        ]
+      },
+      {
+        "slug": "http-messages",
+        "title": "HTTP 消息：请求与响应的报文结构",
+        "url": "https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Messages",
+        "stack": "backend",
+        "category": "http",
+        "author": "MDN",
+        "license": "CC-BY-SA-4.0",
+        "tags": [
+          "后端",
+          "HTTP"
+        ]
+      },
+      {
+        "slug": "sql-intro",
+        "title": "SQL 入门：从查询开始",
+        "url": "https://www.runoob.com/sql/sql-tutorial.html",
+        "stack": "backend",
+        "category": "database",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "后端",
+          "数据库"
+        ]
+      },
+      {
+        "slug": "sqlite-intro",
+        "title": "SQLite 入门：单文件数据库",
+        "url": "https://www.runoob.com/sqlite/sqlite-tutorial.html",
+        "stack": "backend",
+        "category": "database",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "后端",
+          "数据库"
+        ]
+      },
+      {
+        "slug": "docker-intro",
+        "title": "Docker 入门：镜像与容器",
+        "url": "https://www.runoob.com/docker/docker-tutorial.html",
+        "stack": "backend",
+        "category": "deployment",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "后端",
+          "部署"
+        ]
+      },
+      {
+        "slug": "java-intro",
+        "title": "Java 入门：第一个程序与基本语法",
+        "url": "https://www.runoob.com/java/java-tutorial.html",
+        "stack": "languages",
+        "category": "java",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "Java",
+          "入门"
+        ]
+      },
+      {
+        "slug": "java-oop",
+        "title": "Java 面向对象：类、对象与继承",
+        "url": "https://www.runoob.com/java/java-object-classes.html",
+        "stack": "languages",
+        "category": "java",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "Java",
+          "面向对象"
+        ]
+      },
+      {
+        "slug": "python-intro",
+        "title": "Python 入门：语法与数据结构",
+        "url": "https://www.runoob.com/python3/python3-basic-syntax.html",
+        "stack": "languages",
+        "category": "python",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "Python",
+          "入门"
+        ]
+      }
+    ],
+    "p0": [
+      {
+        "slug": "js-closures",
+        "title": "JavaScript 闭包：作用域与词法环境",
+        "url": "https://www.runoob.com/js/js-function-closures.html",
+        "stack": "frontend",
+        "category": "javascript",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "前端",
+          "JavaScript",
+          "闭包"
+        ]
+      },
+      {
+        "slug": "js-promise",
+        "title": "Promise：异步的三种状态",
+        "url": "https://www.runoob.com/js/js-promise.html",
+        "stack": "frontend",
+        "category": "javascript",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "前端",
+          "JavaScript",
+          "异步"
+        ]
+      },
+      {
+        "slug": "js-es6",
+        "title": "ES6 入门：let / const、解构与异步",
+        "url": "https://www.runoob.com/w3cnote/es6-tutorial.html",
+        "stack": "frontend",
+        "category": "javascript",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "前端",
+          "JavaScript",
+          "ES6"
+        ]
+      },
+      {
+        "slug": "js-dom",
+        "title": "DOM 操作：选中与修改页面",
+        "url": "https://www.runoob.com/js/js-htmldom.html",
+        "stack": "frontend",
+        "category": "javascript",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "前端",
+          "JavaScript",
+          "DOM"
+        ]
+      },
+      {
+        "slug": "js-array-methods",
+        "title": "数组对象与方法速查",
+        "url": "https://www.runoob.com/jsref/jsref-obj-array.html",
+        "stack": "frontend",
+        "category": "javascript",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "前端",
+          "JavaScript",
+          "数组",
+          "map",
+          "filter",
+          "reduce"
+        ]
+      },
+      {
+        "slug": "css-flexbox",
+        "title": "Flexbox 弹性布局",
+        "url": "https://www.runoob.com/css3/css3-flexbox.html",
+        "stack": "frontend",
+        "category": "html-css",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "前端",
+          "CSS",
+          "布局"
+        ]
+      },
+      {
+        "slug": "react-learn",
+        "title": "React 入门：从组件到状态",
+        "url": "https://zh-hans.react.dev/learn",
+        "stack": "frontend",
+        "category": "react",
+        "author": "react.dev",
+        "license": "CC-BY-4.0",
+        "tags": [
+          "前端",
+          "React"
+        ]
+      },
+      {
+        "slug": "react-hooks",
+        "title": "React Hooks 参考",
+        "url": "https://zh-hans.react.dev/reference/react",
+        "stack": "frontend",
+        "category": "react",
+        "author": "react.dev",
+        "license": "CC-BY-4.0",
+        "tags": [
+          "前端",
+          "React",
+          "Hooks"
+        ]
+      },
+      {
+        "slug": "ts-everyday-types",
+        "title": "TypeScript 日常类型",
+        "url": "https://www.typescriptlang.org/zh/docs/handbook/2/everyday-types.html",
+        "stack": "frontend",
+        "category": "typescript",
+        "author": "TypeScript",
+        "license": "Apache-2.0",
+        "tags": [
+          "前端",
+          "TypeScript"
+        ]
+      }
+    ],
+    "p1": [
+      {
+        "slug": "http-status-codes",
+        "title": "HTTP 状态码速查",
+        "url": "https://www.runoob.com/http/http-status-codes.html",
+        "stack": "backend",
+        "category": "http",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "后端",
+          "HTTP",
+          "状态码"
+        ]
+      },
+      {
+        "slug": "http-tutorial",
+        "title": "HTTP 协议基础",
+        "url": "https://www.runoob.com/http/http-tutorial.html",
+        "stack": "backend",
+        "category": "http",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "后端",
+          "HTTP"
+        ]
+      },
+      {
+        "slug": "restful",
+        "title": "RESTful 架构风格",
+        "url": "https://www.runoob.com/w3cnote/restful-architecture.html",
+        "stack": "backend",
+        "category": "api-design",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "后端",
+          "接口",
+          "REST"
+        ]
+      },
+      {
+        "slug": "sql-join",
+        "title": "SQL JOIN：多表关联查询",
+        "url": "https://www.runoob.com/sql/sql-join.html",
+        "stack": "backend",
+        "category": "database",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "后端",
+          "数据库",
+          "JOIN"
+        ]
+      },
+      {
+        "slug": "redis-intro",
+        "title": "Redis 入门：内存数据库与缓存",
+        "url": "https://www.runoob.com/redis/redis-tutorial.html",
+        "stack": "backend",
+        "category": "database",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "后端",
+          "数据库",
+          "Redis"
+        ]
+      },
+      {
+        "slug": "nginx-intro",
+        "title": "Nginx 安装与配置入门",
+        "url": "https://www.runoob.com/w3cnote/nginx-setup-intro.html",
+        "stack": "backend",
+        "category": "deployment",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "后端",
+          "部署",
+          "Nginx"
+        ]
+      },
+      {
+        "slug": "npm-intro",
+        "title": "npm 包管理与 package.json",
+        "url": "https://www.runoob.com/nodejs/nodejs-npm.html",
+        "stack": "frontend",
+        "category": "tooling",
+        "author": "菜鸟教程",
+        "license": "proprietary",
+        "tags": [
+          "前端",
+          "工具",
+          "npm"
+        ]
+      }
+    ],
+    "p2": []
+  }
+}

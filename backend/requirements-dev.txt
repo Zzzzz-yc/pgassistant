@@ -1,0 +1,4 @@
+# Dev-only dependencies. Keep this file ASCII-only: pip decodes requirement
+# files with the system locale, and UTF-8 without BOM breaks on zh-CN Windows.
+-r requirements.txt
+pytest>=8.0

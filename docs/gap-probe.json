@@ -1,0 +1,448 @@
+{
+  "前端/HTML-CSS": [
+    {
+      "query": "HTML 语义化",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "HTML 基础：给内容搭骨架"
+    },
+    {
+      "query": "CSS Flexbox",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "Flexbox 弹性布局"
+    },
+    {
+      "query": "CSS Grid",
+      "hit": true,
+      "mode": "OR",
+      "top": "动态规划解题思路"
+    },
+    {
+      "query": "响应式布局",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "HTTP 消息：请求与响应的报文结构"
+    },
+    {
+      "query": "CSS 变量",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "CSS 第一步：排版与配色"
+    }
+  ],
+  "前端/JavaScript": [
+    {
+      "query": "闭包",
+      "hit": true,
+      "mode": "SINGLE",
+      "top": "JavaScript 闭包：作用域与词法环境"
+    },
+    {
+      "query": "原型链",
+      "hit": true,
+      "mode": "SINGLE",
+      "top": "面试清单：数据结构：数组、链表、栈、队列、哈希"
+    },
+    {
+      "query": "Promise",
+      "hit": true,
+      "mode": "SINGLE",
+      "top": "Promise：异步的三种状态"
+    },
+    {
+      "query": "async await",
+      "hit": true,
+      "mode": "AND",
+      "top": "Promise：异步的三种状态"
+    },
+    {
+      "query": "事件循环",
+      "hit": true,
+      "mode": "OR",
+      "top": "面试清单：面试流程与准备工作"
+    },
+    {
+      "query": "DOM 操作",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "DOM 操作：选中与修改页面"
+    },
+    {
+      "query": "模块化 import export",
+      "hit": true,
+      "mode": "OR",
+      "top": "双向队列"
+    },
+    {
+      "query": "this 指向",
+      "hit": true,
+      "mode": "AND",
+      "top": "链表"
+    },
+    {
+      "query": "数组方法 map filter",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "数组对象与方法速查"
+    }
+  ],
+  "前端/工程化": [
+    {
+      "query": "npm 包管理",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "npm 包管理与 package.json"
+    },
+    {
+      "query": "Vite 构建",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    },
+    {
+      "query": "webpack",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    },
+    {
+      "query": "TypeScript 类型",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "TypeScript 日常类型"
+    },
+    {
+      "query": "ESLint",
+      "hit": true,
+      "mode": "SINGLE",
+      "top": "React Hooks 参考"
+    }
+  ],
+  "前端/框架": [
+    {
+      "query": "React 组件",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "React Hooks 参考"
+    },
+    {
+      "query": "React Hooks",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "React Hooks 参考"
+    },
+    {
+      "query": "Vue 响应式",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    },
+    {
+      "query": "状态管理",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "HTTP 状态码速查"
+    },
+    {
+      "query": "路由",
+      "hit": true,
+      "mode": "SINGLE",
+      "top": "HTTP 概述：请求与响应"
+    }
+  ],
+  "后端/网络": [
+    {
+      "query": "HTTP 状态码",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "HTTP 协议基础"
+    },
+    {
+      "query": "HTTPS TLS",
+      "hit": true,
+      "mode": "AND",
+      "top": "HTTP 概述：请求与响应"
+    },
+    {
+      "query": "CORS 跨域",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    },
+    {
+      "query": "TCP 三次握手",
+      "hit": true,
+      "mode": "OR",
+      "top": "HTTP 协议基础"
+    },
+    {
+      "query": "DNS",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    }
+  ],
+  "后端/接口": [
+    {
+      "query": "REST 设计",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "RESTful 架构风格"
+    },
+    {
+      "query": "GraphQL",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    },
+    {
+      "query": "JWT 认证",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    },
+    {
+      "query": "接口幂等",
+      "hit": true,
+      "mode": "SINGLE",
+      "top": "RESTful 架构风格"
+    },
+    {
+      "query": "分页设计",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    }
+  ],
+  "后端/数据库": [
+    {
+      "query": "数据库索引",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "Redis 入门：内存数据库与缓存"
+    },
+    {
+      "query": "事务隔离级别",
+      "hit": true,
+      "mode": "OR",
+      "top": "SQLite 入门：单文件数据库"
+    },
+    {
+      "query": "SQL JOIN",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "SQL JOIN：多表关联查询"
+    },
+    {
+      "query": "慢查询优化",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "SQL 入门：从查询开始"
+    },
+    {
+      "query": "Redis 缓存",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "Redis 入门：内存数据库与缓存"
+    },
+    {
+      "query": "NoSQL",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    }
+  ],
+  "后端/部署": [
+    {
+      "query": "Docker 镜像",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "Docker 入门：镜像与容器"
+    },
+    {
+      "query": "Nginx 反向代理",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "Nginx 安装与配置入门"
+    },
+    {
+      "query": "CI CD",
+      "hit": true,
+      "mode": "OR",
+      "top": "哈希表 · 练习"
+    },
+    {
+      "query": "日志收集",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    },
+    {
+      "query": "负载均衡",
+      "hit": true,
+      "mode": "AND",
+      "top": "Nginx 安装与配置入门"
+    }
+  ],
+  "语言/Java": [
+    {
+      "query": "Java 集合",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "Java 入门：第一个程序与基本语法"
+    },
+    {
+      "query": "Java 多线程",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "Java 入门：第一个程序与基本语法"
+    },
+    {
+      "query": "JVM 内存模型",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    },
+    {
+      "query": "Java 泛型",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "Java 入门：第一个程序与基本语法"
+    },
+    {
+      "query": "Spring Boot",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    }
+  ],
+  "语言/Python": [
+    {
+      "query": "Python 装饰器",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "Python 入门：语法与数据结构"
+    },
+    {
+      "query": "列表推导",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "列表"
+    },
+    {
+      "query": "虚拟环境",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    },
+    {
+      "query": "生成器",
+      "hit": true,
+      "mode": "AND",
+      "top": "面试清单：附加学习主题"
+    },
+    {
+      "query": "asyncio",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    }
+  ],
+  "语言/其他": [
+    {
+      "query": "Go 协程",
+      "hit": true,
+      "mode": "OR",
+      "top": "面试清单：编程语言学习资源"
+    },
+    {
+      "query": "Rust 所有权",
+      "hit": true,
+      "mode": "AND+CORE",
+      "top": "数组"
+    },
+    {
+      "query": "C 指针",
+      "hit": true,
+      "mode": "AND",
+      "top": "二叉树"
+    },
+    {
+      "query": "类型系统",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "JavaScript 语法与数据类型"
+    }
+  ],
+  "算法": [
+    {
+      "query": "并查集",
+      "hit": true,
+      "mode": "SINGLE",
+      "top": "面试清单：图与图算法"
+    },
+    {
+      "query": "线段树",
+      "hit": true,
+      "mode": "SINGLE",
+      "top": "二叉树"
+    },
+    {
+      "query": "KMP 字符串匹配",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    },
+    {
+      "query": "拓扑排序",
+      "hit": true,
+      "mode": "AND",
+      "top": "面试清单：图与图算法"
+    },
+    {
+      "query": "最短路 Dijkstra",
+      "hit": true,
+      "mode": "OR",
+      "top": "面试清单：图与图算法"
+    },
+    {
+      "query": "单调栈",
+      "hit": false,
+      "mode": "miss",
+      "top": null
+    }
+  ],
+  "面试": [
+    {
+      "query": "系统设计",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "面试清单：终面与系统设计"
+    },
+    {
+      "query": "行为面试",
+      "hit": true,
+      "mode": "OR",
+      "top": "Flexbox 弹性布局"
+    },
+    {
+      "query": "简历写法",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "面试清单：面试前后：简历、现场与提问"
+    },
+    {
+      "query": "算法复杂度",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "复杂度分析 · 练习"
+    },
+    {
+      "query": "时间复杂度",
+      "hit": true,
+      "mode": "FIELD",
+      "top": "复杂度分析 · 练习"
+    }
+  ]
+}

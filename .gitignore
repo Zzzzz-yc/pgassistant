@@ -1,0 +1,52 @@
+# 运行时数据
+data/
+!data/.gitkeep
+data/backups/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# 本地依赖（jieba 等，用 requirements.txt 恢复）
+.deps/
+.venv/
+
+# 密钥与本地配置
+.env
+.env.*
+!.env.example
+secrets.json
+config.json
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# 日志与临时
+*.log
+logs/
+tmp/
+.cache/
+
+# 编辑器 / 系统
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# 大文件（注意不要写 *.png / *.webp，否则 content/assets 会漏提交）
+*.mp4
+*.mov
+*.zip
+
+# 交接包备份（项目根就是本仓库，这里只作为后备资料库，绝不入库）
+handoff/
