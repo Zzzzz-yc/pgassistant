@@ -1,0 +1,122 @@
+{
+  "title": "资料库",
+  "count": "共 {{total}} 篇 · 用时 {{ms}}ms",
+  "countLoading": "正在加载资料…",
+  "countFailed": "没能取到资料列表",
+  "stillLoading": "仍在加载…",
+  "filter": {
+    "region": "筛选条件",
+    "open": "筛选",
+    "close": "收起筛选",
+    "q": "搜索",
+    "qPlaceholder": "标题或摘要里的词",
+    "stack": "技术栈",
+    "category": "分类",
+    "level": "难度",
+    "type": "类型",
+    "source": "来源",
+    "all": "全部",
+    "clear": "清除筛选",
+    "remove": "移除筛选：{{name}}"
+  },
+  "level": {
+    "label": "难度",
+    "beginner": "入门",
+    "intermediate": "进阶",
+    "advanced": "高级"
+  },
+  "source": {
+    "repo": "仓库",
+    "private": "私有"
+  },
+  "sort": {
+    "label": "排序",
+    "default": "默认（技术栈 / 分类 / 标题）",
+    "title": "标题",
+    "duration_min": "时长",
+    "updated_at": "最近更新"
+  },
+  "pager": {
+    "previous": "上一页",
+    "next": "下一页",
+    "navigation": "分页"
+  },
+  "empty": {
+    "title": "这里还没有资料",
+    "description": "换个方向看看，或者让助手按你的目标生成一份学习计划。",
+    "action": "清除筛选",
+    "planAction": "让助手出计划"
+  },
+  "zero": {
+    "title": "没有找到「{{query}}」",
+    "description": "库里暂时没有匹配的资料。可以去掉筛选再试一次，或者换个问法。",
+    "clear": "去掉筛选重试",
+    "semantic": "尝试语义搜索（需先在设置里配置）",
+    "assistant": "让助手帮你找"
+  },
+  "gone": {
+    "title": "这篇资料已下架",
+    "description": "它可能被移除或改名了。资料库里的其它条目不受影响。",
+    "action": "返回资料库"
+  },
+  "crumb": {
+    "label": "面包屑",
+    "library": "资料库"
+  },
+  "toc": "目录",
+  "lightbox": "图片预览",
+  "siblings": "上一节 / 下一节",
+  "prev": "上一节",
+  "next": "下一节",
+  "noPrev": "已经是第一节",
+  "noNext": "已经是最后一节",
+  "related": {
+    "title": "相关推荐",
+    "empty": "这个分类下暂时没有其它资料。"
+  },
+  "addToPlan": {
+    "title": "加入计划",
+    "description": "选择要放进哪个阶段。",
+    "cta": "加入计划",
+    "plan": "目标计划",
+    "success": "已加入「{{stage}}」",
+    "failed": "加入失败",
+    "stageMeta": "{{count}} 个条目 · {{weeks}} 周",
+    "noPlan": {
+      "title": "还没有激活的学习计划",
+      "description": "先有一份计划，才能把资料挂到对应的阶段里。",
+      "action": "去生成计划"
+    }
+  },
+  "home": {
+    "title": "今天学点什么",
+    "subtitle": "本地学习资料库 + 学习计划助手，内容都在你自己的机器上。",
+    "searchLabel": "搜索资料",
+    "searchPlaceholder": "搜一个词，比如「闭包」「动态规划」",
+    "searchAction": "搜索",
+    "hotkey": "按 Ctrl/⌘ + K 打开命令面板，可直接跳到任意资料",
+    "directions": "三个方向",
+    "count": "{{total}} 篇",
+    "enter": "进入",
+    "continue": "继续学习",
+    "progress": "已完成 {{percent}}%",
+    "noPlan": {
+      "title": "还没有学习计划",
+      "description": "让助手按你的目标和时间生成一份，也可以手动创建。",
+      "action": "生成学习计划"
+    },
+    "allDone": {
+      "title": "这轮都学完了",
+      "description": "激活计划里已经没有未完成的条目。",
+      "action": "查看计划"
+    }
+  },
+  "onboard": {
+    "label": "首次使用引导",
+    "text": "第一次来？三件事就能上手：",
+    "search": "搜一个词",
+    "plan": "让助手出计划",
+    "browse": "随便逛逛",
+    "dismiss": "不再显示引导"
+  }
+}

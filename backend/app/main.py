@@ -31,7 +31,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .api import deps, pages, plan_templates, plans, resources, search, taxonomy
+from .api import deps, media, pages, plan_templates, plans, resources, search, taxonomy
 from .core import errors
 from .core.config import SETTINGS
 from .core.security import SecurityPolicy, new_token
@@ -127,6 +127,10 @@ app.include_router(resources.router, prefix="/api", tags=["resources"])
 app.include_router(taxonomy.router, prefix="/api", tags=["taxonomy"])
 app.include_router(plans.router, prefix="/api", tags=["plans"])
 app.include_router(plan_templates.router, prefix="/api", tags=["plan-templates"])
+# 内容媒体（D24）：**不在 `/api` 前缀下**，因此天然免 X-App-Token；
+# Sec-Fetch-Site 与路径校验在 api/media.py 里，中间件（含 EXEMPT_API_PATHS）不动。
+# 必须早于 pages 的 SPA 回退 `/{full_path:path}`，否则 /media/* 会被吞成 HTML。
+app.include_router(media.router, tags=["media"])
 
 
 class AssetsMount:

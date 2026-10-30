@@ -1,0 +1,122 @@
+{
+  "title": "Library",
+  "count": "{{total}} resources · {{ms}}ms",
+  "countLoading": "Loading resources…",
+  "countFailed": "Could not load the list",
+  "stillLoading": "still loading…",
+  "filter": {
+    "region": "Filters",
+    "open": "Filters",
+    "close": "Hide filters",
+    "q": "Search",
+    "qPlaceholder": "A word from the title or summary",
+    "stack": "Track",
+    "category": "Category",
+    "level": "Level",
+    "type": "Type",
+    "source": "Source",
+    "all": "All",
+    "clear": "Clear filters",
+    "remove": "Remove filter: {{name}}"
+  },
+  "level": {
+    "label": "Level",
+    "beginner": "Beginner",
+    "intermediate": "Intermediate",
+    "advanced": "Advanced"
+  },
+  "source": {
+    "repo": "Repository",
+    "private": "Private"
+  },
+  "sort": {
+    "label": "Sort",
+    "default": "Default (track / category / title)",
+    "title": "Title",
+    "duration_min": "Duration",
+    "updated_at": "Recently updated"
+  },
+  "pager": {
+    "previous": "Previous",
+    "next": "Next",
+    "navigation": "Pagination"
+  },
+  "empty": {
+    "title": "Nothing here yet",
+    "description": "Try another track, or let the assistant build a plan around your goal.",
+    "action": "Clear filters",
+    "planAction": "Ask for a plan"
+  },
+  "zero": {
+    "title": "No results for “{{query}}”",
+    "description": "Nothing matches yet. Drop the filters and try again, or rephrase the query.",
+    "clear": "Retry without filters",
+    "semantic": "Try semantic search (configure it in Settings first)",
+    "assistant": "Ask the assistant to find it"
+  },
+  "gone": {
+    "title": "This resource is gone",
+    "description": "It may have been removed or renamed. The rest of the library is unaffected.",
+    "action": "Back to library"
+  },
+  "crumb": {
+    "label": "Breadcrumb",
+    "library": "Library"
+  },
+  "toc": "Contents",
+  "lightbox": "Image preview",
+  "siblings": "Previous / next",
+  "prev": "Previous",
+  "next": "Next",
+  "noPrev": "This is the first section",
+  "noNext": "This is the last section",
+  "related": {
+    "title": "Related",
+    "empty": "No other resources in this category yet."
+  },
+  "addToPlan": {
+    "title": "Add to plan",
+    "description": "Pick the stage this resource belongs to.",
+    "cta": "Add to plan",
+    "plan": "Target plan",
+    "success": "Added to “{{stage}}”",
+    "failed": "Could not add it",
+    "stageMeta": "{{count}} items · {{weeks}} weeks",
+    "noPlan": {
+      "title": "No active plan yet",
+      "description": "Create a plan first, then resources can be attached to its stages.",
+      "action": "Create a plan"
+    }
+  },
+  "home": {
+    "title": "What are we learning today?",
+    "subtitle": "A local library plus a planning assistant — everything stays on your machine.",
+    "searchLabel": "Search resources",
+    "searchPlaceholder": "Try “closures” or “dynamic programming”",
+    "searchAction": "Search",
+    "hotkey": "Press Ctrl/⌘ + K for the command palette and jump straight to any resource",
+    "directions": "Three tracks",
+    "count": "{{total}} resources",
+    "enter": "Browse",
+    "continue": "Continue learning",
+    "progress": "{{percent}}% done",
+    "noPlan": {
+      "title": "No study plan yet",
+      "description": "Let the assistant build one from your goal and available hours, or create it by hand.",
+      "action": "Create a study plan"
+    },
+    "allDone": {
+      "title": "All caught up",
+      "description": "There are no open items left in the active plan.",
+      "action": "Open the plan"
+    }
+  },
+  "onboard": {
+    "label": "Getting started",
+    "text": "First time here? Three ways in:",
+    "search": "Search a word",
+    "plan": "Let the assistant plan",
+    "browse": "Just browse",
+    "dismiss": "Hide the guide"
+  }
+}

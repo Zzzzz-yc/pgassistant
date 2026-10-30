@@ -7,7 +7,7 @@
  * 3. `app:reload-required`（403 TOKEN_INVALID）→ 常驻 Toast 提示重新加载；
  * 4. Toast 出口。
  */
-import { Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation } from "react-router-dom";
 
@@ -16,23 +16,23 @@ import { PageFallback } from "@/components/layout/PageFallback";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ToastHost } from "@/components/layout/ToastHost";
 import { Topbar } from "@/components/layout/Topbar";
+import { SidebarPlanTree } from "@/features/plans/components/SidebarPlanTree";
+import { useActivePlan } from "@/features/plans/hooks";
 import { errorAction, errorMessage } from "@/i18n";
 import { RELOAD_REQUIRED_EVENT } from "@/lib/http";
 import { pushToast, useHotkeys } from "@/lib/query";
 
-/**
- * 计划树插槽（§9.1）：有激活计划时，侧栏改为渲染计划树。
- * 接线方是计划模块（M3）：在 `features/plans/**` 实现 PlanTree 后，
- * 把这里换成 lazy 引入即生效；M0 恒为 null，侧栏走「章节树」分支。
- */
-const PLAN_TREE_SLOT: ReactNode | null = null;
-
 export function AppShell() {
-  const { t } = useTranslation(["nav", "common"]);
+  const { t } = useTranslation(["nav", "common", "plans"]);
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  /**
+   * 计划树插槽（§9.1）：有激活计划时，侧栏改为渲染计划树（M3 注入）。
+   * 没有激活计划时传 `null`，`Sidebar` 自动回退到「章节树」分支。
+   */
+  const { plan: activePlan } = useActivePlan();
 
   const closePalette = useCallback(() => setPaletteOpen(false), []);
 
@@ -76,7 +76,12 @@ export function AppShell() {
           collapsed={collapsed}
           onToggleCollapsed={() => setCollapsed((value) => !value)}
           mobileOpen={mobileOpen}
-          planTree={PLAN_TREE_SLOT}
+          planTreeLabel={t("plans:tree.title")}
+          planTree={
+            activePlan ? (
+              <SidebarPlanTree plan={activePlan} onNavigate={() => setMobileOpen(false)} />
+            ) : null
+          }
           onNavigate={() => setMobileOpen(false)}
         />
 

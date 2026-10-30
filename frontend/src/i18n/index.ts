@@ -6,6 +6,12 @@
  *   不新建 namespace（要新建先找前端骨架）。
  * - 语言持久化到 `localStorage["pg_lang"]`（**只有语言**；令牌绝不进存储）。
  * - 错误码 → 文案**只在这里**（`locales/<lang>/errors.json`），页面不得写 if 链。
+ *
+ * M3 增补（计划模块）：新增 `plans` 命名空间 + `locales/<lang>/plans.json`，
+ * 对应 MODULES.md §1.2「各模块只写自己的 namespace」。除此之外未改任何既有键。
+ *
+ * M2 增补（资料页）：新增 `library` 命名空间 + `locales/<lang>/library.json`，
+ * 只加行、不改既有键（首页 / 资料库 / 资料详情 / 加入计划）。
  */
 import i18n, { type Resource } from "i18next";
 import { initReactI18next, useTranslation } from "react-i18next";
@@ -14,20 +20,24 @@ import type { Locale } from "@/types/api";
 
 import enCommon from "./locales/en-US/common.json";
 import enErrors from "./locales/en-US/errors.json";
+import enLibrary from "./locales/en-US/library.json";
 import enNav from "./locales/en-US/nav.json";
+import enPlans from "./locales/en-US/plans.json";
 import zhCommon from "./locales/zh-CN/common.json";
 import zhErrors from "./locales/zh-CN/errors.json";
+import zhLibrary from "./locales/zh-CN/library.json";
 import zhNav from "./locales/zh-CN/nav.json";
+import zhPlans from "./locales/zh-CN/plans.json";
 
 export const LANG_STORAGE_KEY = "pg_lang";
 export const DEFAULT_LOCALE: Locale = "zh-CN";
 export const SUPPORTED_LOCALES: readonly Locale[] = ["zh-CN", "en-US"];
-export const NAMESPACES = ["common", "nav", "errors"] as const;
+export const NAMESPACES = ["common", "nav", "errors", "plans", "library"] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 
 const resources: Resource = {
-  "zh-CN": { common: zhCommon, nav: zhNav, errors: zhErrors },
-  "en-US": { common: enCommon, nav: enNav, errors: enErrors },
+  "zh-CN": { common: zhCommon, nav: zhNav, errors: zhErrors, plans: zhPlans, library: zhLibrary },
+  "en-US": { common: enCommon, nav: enNav, errors: enErrors, plans: enPlans, library: enLibrary },
 };
 
 const KNOWN_ERROR_CODES = new Set(Object.keys(zhErrors));

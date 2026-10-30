@@ -2,8 +2,18 @@
 
 三级降级：全词 AND → 主词 AND + 其余 OR → 全词 OR（且必须命中主词）。
 比「命中一个无关词就返回」更保守，避免 kafka 这类真·缺失的查询返回噪音。
+
+M2 追加两个能力（签名固定，见 `MODULES.md` §2.2）：
+- `record_miss()`：零结果写 `search_misses`（§9.9 / §16 验收项），**写失败不影响响应**；
+- `related()`：委托 `services/search_ext.py`，与列表接口共用同一份序列化。
 """
+import json
+import sqlite3
+from datetime import datetime, timezone
+
 from . import tokenizer
+from .search_ext import related  # noqa: F401  （契约签名在 search.py；实现在 search_ext.py）
+
 
 Q = chr(34)
 
@@ -142,3 +152,33 @@ def search(conn, q, stack=None, level=None, rtype=None, category=None,
         })
 
     return {"items": items[:limit], "total": len(items), "mode": mode, "tokens": tokens}
+
+
+def record_miss(conn, query: str, filters: dict | None = None) -> None:
+    """零结果时写 `search_misses`（§9.9：供补内容用）。
+
+    **不抛异常**：这是搜索的副产品，写失败不能把 200 变成 500；调用方也不需要 try。
+    `filters` 序列化成 JSON（没有筛选就存 NULL），空 dict 与 None 等价。
+    """
+    payload = None
+    if filters:
+        try:
+            payload = json.dumps(filters, ensure_ascii=False, sort_keys=True)
+        except (TypeError, ValueError):
+            payload = None
+    try:
+        conn.execute(
+            "INSERT INTO search_misses (query, filters, created_at) VALUES (?, ?, ?)",
+            (
+                (query or "").strip()[:200],
+                payload,
+                datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            ),
+        )
+        conn.commit()
+    except sqlite3.Error:
+        try:
+            conn.rollback()
+        except sqlite3.Error:
+            pass
+

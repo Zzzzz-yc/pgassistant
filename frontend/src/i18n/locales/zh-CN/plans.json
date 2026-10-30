@@ -1,0 +1,243 @@
+{
+  "common": {
+    "cancel": "取消",
+    "save": "保存",
+    "delete": "删除",
+    "confirm": "确认"
+  },
+  "list": {
+    "title": "学习计划",
+    "subtitle": "共 {{count}} 份 · 同一时间只有一份处于进行中",
+    "new": "新建计划",
+    "filter": {
+      "all": "全部",
+      "active": "进行中",
+      "archived": "已归档"
+    },
+    "empty": {
+      "title": "还没有学习计划",
+      "description": "套用岗位模板 0 秒生成可编辑草案，或从空白开始自己拆阶段。",
+      "action": "新建计划"
+    },
+    "card": {
+      "weeks": "{{weeks}} 周 · 每周 {{hours}} 小时",
+      "updated": "更新于 {{time}}",
+      "open": "打开计划",
+      "active": "进行中",
+      "archived": "已归档"
+    },
+    "action": {
+      "rename": "改名",
+      "archive": "归档",
+      "activate": "设为进行中",
+      "duplicate": "复制为新计划",
+      "delete": "删除"
+    },
+    "delete": {
+      "title": "删除这个计划？",
+      "body": "「{{title}}」会被软删除：不再出现在任何列表里，阶段与打勾历史留在库中但不参与统计。本期没有撤销入口，恢复只能靠备份。",
+      "confirm": "删除"
+    },
+    "rename": {
+      "title": "重命名计划",
+      "label": "计划名",
+      "placeholder": "例如：12 周前端入门"
+    }
+  },
+  "new": {
+    "title": "新建学习计划",
+    "step": {
+      "form": "描述目标",
+      "preview": "预览编辑"
+    },
+    "quick": {
+      "title": "一句话抽取",
+      "placeholder": "三个月转前端，每天两小时",
+      "button": "帮我填好表单",
+      "disabled": "一句话抽取将在 M4 落地（需要先配置模型）",
+      "note": "按钮暂为禁用占位：M4 落地后调 POST /api/agent/extract 回填下面的表单，回填后仍可手改。"
+    },
+    "goal": {
+      "label": "学习目标",
+      "placeholder": "例如：能独立完成一个中型 React 项目",
+      "hint": "自由文本。写「嵌入式」也完全支持，模板只是快捷方式。"
+    },
+    "quickTags": {
+      "label": "常见目标"
+    },
+    "tag": {
+      "frontend": "前端入门",
+      "backend": "后端入门",
+      "algo": "算法基础",
+      "interview": "面试冲刺"
+    },
+    "base": {
+      "label": "当前基础",
+      "beginner": "零基础",
+      "intermediate": "有一些基础",
+      "advanced": "比较熟练"
+    },
+    "hours": {
+      "label": "每周可投入",
+      "unit": "小时"
+    },
+    "weeks": {
+      "label": "期望周期",
+      "unit": "周"
+    },
+    "prefer": {
+      "label": "偏好",
+      "video": "视频",
+      "docs": "文档",
+      "any": "都行"
+    },
+    "template": {
+      "title": "套用模板",
+      "note": "0 秒、0 token：模板直接进预览编辑页，改完才写库。",
+      "blank": "从空白开始",
+      "blankNote": "只有阶段骨架，条目自己加",
+      "meta": "{{stages}} 阶段 · {{items}} 条",
+      "loading": "正在读取模板…",
+      "failed": "该模板暂不可用，已按表单内容搭了一份草案"
+    },
+    "submit": "下一步：预览",
+    "preview": {
+      "title": "预览编辑",
+      "note": "左侧阶段可增删改名，右侧条目可改时长、备注。这一步**还没写库**。",
+      "stageTitle": "阶段名",
+      "stageWeeks": "阶段周数",
+      "itemTitle": "条目标题",
+      "duration": "时长（分钟）",
+      "noteField": "备注",
+      "addStage": "添加阶段",
+      "addItem": "添加条目",
+      "removeStage": "删除阶段",
+      "removeItem": "删除条目",
+      "custom": "自定义任务",
+      "total": "共 {{items}} 条 · 约 {{minutes}} 分钟"
+    },
+    "save": "保存计划",
+    "saving": "保存中…",
+    "leave": {
+      "title": "未保存的修改将丢失",
+      "body": "离开后这次编辑不会写库，确定要离开吗？",
+      "confirm": "仍然离开",
+      "cancel": "继续编辑"
+    },
+    "invalid": {
+      "title": "计划还没通过校验",
+      "count": "总条目需要 5–40 条，每个阶段 1–20 条，阶段数 2–8 个。",
+      "titleField": "计划名需要 1–60 个字",
+      "goalField": "学习目标需要 1–120 个字",
+      "stageTitle": "阶段名需要 1–30 个字",
+      "itemTitle": "条目标题需要 1–80 个字",
+      "duration": "时长需要 10–240 分钟",
+      "weeks": "周期需要 4–52 周",
+      "hours": "每周小时需要 1–40"
+    }
+  },
+  "plan": {
+    "notFound": "计划不存在或已删除",
+    "backToList": "返回计划列表",
+    "header": {
+      "remaining": "剩余 {{weeks}} 周",
+      "invested": "已投入 {{duration}}",
+      "progress": "完成 {{percent}}%",
+      "view": {
+        "timeline": "时间轴",
+        "graph": "节点图",
+        "graphHint": "节点图是二期目标，数据模型已预留 depends_on"
+      }
+    },
+    "filter": {
+      "label": "筛选条目",
+      "all": "全部",
+      "todo": "只看未完成",
+      "video": "只看视频",
+      "videoHint": "需要条目带资料类型字段：当前 ItemRead 不含 type（契约缺口），补字段后开放"
+    },
+    "stage": {
+      "items": "{{count}} 条",
+      "meta": "{{count}} 条 · {{percent}}%",
+      "addItem": "添加条目",
+      "rename": "重命名阶段",
+      "delete": "删除阶段",
+      "deleteTitle": "删除这个阶段？",
+      "deleteBody": "「{{title}}」及其 {{count}} 条条目会被永久删除——阶段是硬删除，不保留历史。",
+      "renamed": "阶段已改名",
+      "removed": "阶段已删除",
+      "collapse": "折叠阶段",
+      "expand": "展开阶段",
+      "orderHint": "拖拽手柄可调整阶段顺序"
+    },
+    "item": {
+      "done": "标记完成",
+      "todo": "标记未完成",
+      "skipped": "跳过",
+      "custom": "自定义任务",
+      "unavailable": "资料已下架",
+      "bound": "已绑定资料",
+      "unbound": "自定义任务",
+      "duration": "时长（分钟）",
+      "note": "备注",
+      "delete": "删除条目",
+      "deleteTitle": "删除这个条目？",
+      "deleteBody": "「{{title}}」会被软删除：保留打勾历史，但不再参与进度统计。",
+      "updated": "条目已更新",
+      "removed": "条目已删除",
+      "added": "条目已添加",
+      "dragHint": "拖拽手柄可跨阶段移动"
+    },
+    "outline": {
+      "title": "阶段大纲",
+      "empty": "还没有阶段"
+    },
+    "addStage": "添加阶段",
+    "addStagePlaceholder": "阶段名（1–30 字）",
+    "addItemTitle": "新条目",
+    "renamed": "已改名",
+    "archived": "已归档",
+    "activated": "已设为进行中"
+  },
+  "tree": {
+    "title": "计划树",
+    "empty": "还没有激活的计划",
+    "progress": "{{percent}}%",
+    "collapse": "折叠",
+    "expand": "展开",
+    "switch": "切换计划"
+  },
+  "reading": {
+    "back": "返回计划",
+    "notBound": "这条任务没有绑定资料，没有可阅读的正文。",
+    "openFull": "在资料库中打开",
+    "loading": "正在读取资料…",
+    "missing": "资料已下架或不存在"
+  },
+  "summary": {
+    "done": "完成条目",
+    "items": "{{done}} / {{total}}",
+    "invested": "已投入学时",
+    "remaining": "剩余周数",
+    "weeks": "{{weeks}} 周",
+    "skipped": "已跳过 {{count}} 条"
+  },
+  "conflict": {
+    "refreshed": "已在别处更新，已为你刷新"
+  },
+  "toast": {
+    "created": "计划已创建",
+    "saved": "计划已保存",
+    "renamed": "已改名",
+    "archived": "已归档",
+    "activated": "已设为进行中",
+    "duplicated": "已复制为新计划",
+    "deleted": "计划已删除",
+    "stageAdded": "阶段已添加",
+    "stageRenamed": "阶段已改名",
+    "stageDeleted": "阶段已删除",
+    "itemAdded": "条目已添加",
+    "itemUpdated": "条目已更新",
+    "itemDeleted": "条目已删除"
+  }
+}

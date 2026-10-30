@@ -19,6 +19,8 @@ export interface SidebarProps {
   mobileOpen: boolean;
   /** 计划树插槽：M3 注入。为 null 时回退到章节树。 */
   planTree?: ReactNode | null;
+  /** 插槽标题（M3 用计划命名空间的 `tree.title`；不传沿用 nav 的占位文案）。 */
+  planTreeLabel?: ReactNode;
   /** 点侧栏里的链接后调用（移动端用来关抽屉）。 */
   onNavigate?: () => void;
 }
@@ -28,6 +30,7 @@ export function Sidebar({
   onToggleCollapsed,
   mobileOpen,
   planTree = null,
+  planTreeLabel,
   onNavigate,
 }: SidebarProps) {
   const { t } = useTranslation("nav");
@@ -44,7 +47,9 @@ export function Sidebar({
   return (
     <aside className={className} aria-label={t("chapters")}>
       <div className="sidebar__header">
-        <span className="sidebar__title">{planTree ? t("planTreeSlot") : t("chapters")}</span>
+        <span className="sidebar__title">
+          {planTree ? (planTreeLabel ?? t("planTreeSlot")) : t("chapters")}
+        </span>
         <button
           type="button"
           className="sidebar__toggle"

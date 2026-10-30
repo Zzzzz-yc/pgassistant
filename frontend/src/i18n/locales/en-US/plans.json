@@ -1,0 +1,243 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "confirm": "Confirm"
+  },
+  "list": {
+    "title": "Study plans",
+    "subtitle": "{{count}} total · only one plan is active at a time",
+    "new": "New plan",
+    "filter": {
+      "all": "All",
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "empty": {
+      "title": "No study plan yet",
+      "description": "Start from a role template in 0 seconds, or build the stages yourself.",
+      "action": "New plan"
+    },
+    "card": {
+      "weeks": "{{weeks}} weeks · {{hours}} h/week",
+      "updated": "Updated {{time}}",
+      "open": "Open plan",
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "action": {
+      "rename": "Rename",
+      "archive": "Archive",
+      "activate": "Make active",
+      "duplicate": "Duplicate as new plan",
+      "delete": "Delete"
+    },
+    "delete": {
+      "title": "Delete this plan?",
+      "body": "\"{{title}}\" will be soft-deleted: it disappears from every list, while stages and check history stay in the database without being counted. There is no undo in this release; restoring requires a backup.",
+      "confirm": "Delete"
+    },
+    "rename": {
+      "title": "Rename plan",
+      "label": "Plan name",
+      "placeholder": "e.g. 12-week frontend entry"
+    }
+  },
+  "new": {
+    "title": "New study plan",
+    "step": {
+      "form": "Describe the goal",
+      "preview": "Preview & edit"
+    },
+    "quick": {
+      "title": "Extract from one sentence",
+      "placeholder": "Switch to frontend in three months, two hours a day",
+      "button": "Fill the form for me",
+      "disabled": "One-sentence extract lands in M4 (requires a configured model)",
+      "note": "This button is a disabled placeholder: after M4 it calls POST /api/agent/extract and fills the form below, which stays editable."
+    },
+    "goal": {
+      "label": "Learning goal",
+      "placeholder": "e.g. Build a medium-sized React app on my own",
+      "hint": "Free text. \"Embedded systems\" works too — templates are only shortcuts."
+    },
+    "quickTags": {
+      "label": "Common goals"
+    },
+    "tag": {
+      "frontend": "Frontend entry",
+      "backend": "Backend entry",
+      "algo": "Algorithms basics",
+      "interview": "Interview sprint"
+    },
+    "base": {
+      "label": "Current level",
+      "beginner": "Beginner",
+      "intermediate": "Some basics",
+      "advanced": "Comfortable"
+    },
+    "hours": {
+      "label": "Hours per week",
+      "unit": "h"
+    },
+    "weeks": {
+      "label": "Horizon",
+      "unit": "weeks"
+    },
+    "prefer": {
+      "label": "Preference",
+      "video": "Video",
+      "docs": "Docs",
+      "any": "Any"
+    },
+    "template": {
+      "title": "Use a template",
+      "note": "0 seconds, 0 tokens: the template goes straight into the preview editor and is only saved when you say so.",
+      "blank": "Start from blank",
+      "blankNote": "Stage skeleton only, add items yourself",
+      "meta": "{{stages}} stages · {{items}} items",
+      "loading": "Loading templates…",
+      "failed": "This template is unavailable, a draft was built from the form instead"
+    },
+    "submit": "Next: preview",
+    "preview": {
+      "title": "Preview & edit",
+      "note": "Stages on the left can be added, renamed and removed; items on the right can change duration and notes. Nothing is saved yet.",
+      "stageTitle": "Stage name",
+      "stageWeeks": "Stage weeks",
+      "itemTitle": "Item title",
+      "duration": "Duration (min)",
+      "noteField": "Note",
+      "addStage": "Add stage",
+      "addItem": "Add item",
+      "removeStage": "Remove stage",
+      "removeItem": "Remove item",
+      "custom": "Custom task",
+      "total": "{{items}} items · about {{minutes}} minutes"
+    },
+    "save": "Save plan",
+    "saving": "Saving…",
+    "leave": {
+      "title": "Unsaved changes will be lost",
+      "body": "Leaving now discards this edit. Leave anyway?",
+      "confirm": "Leave anyway",
+      "cancel": "Keep editing"
+    },
+    "invalid": {
+      "title": "The plan does not pass validation yet",
+      "count": "Total items must be 5–40, each stage 1–20, and stages 2–8.",
+      "titleField": "Plan name must be 1–60 characters",
+      "goalField": "Goal must be 1–120 characters",
+      "stageTitle": "Stage name must be 1–30 characters",
+      "itemTitle": "Item title must be 1–80 characters",
+      "duration": "Duration must be 10–240 minutes",
+      "weeks": "Horizon must be 4–52 weeks",
+      "hours": "Weekly hours must be 1–40"
+    }
+  },
+  "plan": {
+    "notFound": "This plan does not exist or was deleted",
+    "backToList": "Back to plan list",
+    "header": {
+      "remaining": "{{weeks}} weeks left",
+      "invested": "{{duration}} invested",
+      "progress": "{{percent}}% done",
+      "view": {
+        "timeline": "Timeline",
+        "graph": "Node graph",
+        "graphHint": "The node graph is a phase-2 goal; depends_on is already reserved in the model"
+      }
+    },
+    "filter": {
+      "label": "Filter items",
+      "all": "All",
+      "todo": "Unfinished only",
+      "video": "Video only",
+      "videoHint": "Needs a resource type on items: ItemRead has no type field yet (contract gap)"
+    },
+    "stage": {
+      "items": "{{count}} items",
+      "meta": "{{count}} items · {{percent}}%",
+      "addItem": "Add item",
+      "rename": "Rename stage",
+      "delete": "Delete stage",
+      "deleteTitle": "Delete this stage?",
+      "deleteBody": "\"{{title}}\" and its {{count}} items are permanently deleted — stages are hard-deleted and keep no history.",
+      "renamed": "Stage renamed",
+      "removed": "Stage deleted",
+      "collapse": "Collapse stage",
+      "expand": "Expand stage",
+      "orderHint": "Drag the handle to reorder stages"
+    },
+    "item": {
+      "done": "Mark done",
+      "todo": "Mark unfinished",
+      "skipped": "Skip",
+      "custom": "Custom task",
+      "unavailable": "Resource removed",
+      "bound": "Resource bound",
+      "unbound": "Custom task",
+      "duration": "Duration (min)",
+      "note": "Note",
+      "delete": "Delete item",
+      "deleteTitle": "Delete this item?",
+      "deleteBody": "\"{{title}}\" will be soft-deleted: check history is kept but it stops counting toward progress.",
+      "updated": "Item updated",
+      "removed": "Item deleted",
+      "added": "Item added",
+      "dragHint": "Drag the handle to move it across stages"
+    },
+    "outline": {
+      "title": "Stage outline",
+      "empty": "No stages yet"
+    },
+    "addStage": "Add stage",
+    "addStagePlaceholder": "Stage name (1–30)",
+    "addItemTitle": "New item",
+    "renamed": "Renamed",
+    "archived": "Archived",
+    "activated": "Set active"
+  },
+  "tree": {
+    "title": "Plan tree",
+    "empty": "No active plan",
+    "progress": "{{percent}}%",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "switch": "Switch plan"
+  },
+  "reading": {
+    "back": "Back to plan",
+    "notBound": "This task has no bound resource, so there is no body to read.",
+    "openFull": "Open in library",
+    "loading": "Loading resource…",
+    "missing": "Resource removed or missing"
+  },
+  "summary": {
+    "done": "Items done",
+    "items": "{{done}} / {{total}}",
+    "invested": "Time invested",
+    "remaining": "Weeks left",
+    "weeks": "{{weeks}} wk",
+    "skipped": "{{count}} skipped"
+  },
+  "conflict": {
+    "refreshed": "Updated elsewhere — refreshed for you"
+  },
+  "toast": {
+    "created": "Plan created",
+    "saved": "Plan saved",
+    "renamed": "Renamed",
+    "archived": "Archived",
+    "activated": "Set active",
+    "duplicated": "Duplicated as a new plan",
+    "deleted": "Plan deleted",
+    "stageAdded": "Stage added",
+    "stageRenamed": "Stage renamed",
+    "stageDeleted": "Stage deleted",
+    "itemAdded": "Item added",
+    "itemUpdated": "Item updated",
+    "itemDeleted": "Item deleted"
+  }
+}
