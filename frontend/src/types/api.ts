@@ -537,6 +537,10 @@ export interface AgentPlanDraftRequest {
 }
 
 export interface AgentChatRequest {
+  /**
+   * 非空即可，**不设长度上限**（D26）：>500 字由服务端 L0 截断后照常 200 / SSE，
+   * 空串或全空白才 422。前端不要自行截断或提前报错。
+   */
   message: string;
   locale?: Locale;
   page_context?: PageContext | null;

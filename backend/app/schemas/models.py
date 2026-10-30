@@ -701,11 +701,25 @@ class AgentPlanDraftRequest(_Request):
 
 
 class AgentChatRequest(_Request):
-    """POST /api/agent/chat（SSE）。历史由服务端维护，客户端不传（§7.8）。"""
+    """POST /api/agent/chat（SSE）。历史由服务端维护，客户端不传（§7.8）。
 
-    message: str = Field(min_length=1, max_length=500)
+    长度口径（D26，以 `需求文档.md` §7.2 为准）：**不设上限**，只校验非空白；
+    >500 字由 L0 `router.normalize(text, max_len=500)` 截断后照常 200 / SSE。
+    空串 / 全空白 → 422 `VALIDATION_ERROR`（字段级校验）。
+    """
+
+    message: str = Field(min_length=1)
     locale: Locale = "zh-CN"
     page_context: PageContext | None = None
+
+    @field_validator("message")
+    @classmethod
+    def _message_not_blank(cls, value: str) -> str:
+        """空/全空白先拒（422）；超长不在这里判，交给 L0 截断（D26）。"""
+        text = value.strip()
+        if not text:
+            raise ValueError("message 不能为空或全空白")
+        return text
 
 
 class TokenUsage(_Model):
