@@ -1,0 +1,503 @@
+/**
+ * 设置页样式（Owner：打磨模块 M5）。
+ *
+ * 两条铁律（`MODULES.md` §1.2）：只用 `styles/tokens.css` 的变量、零色值字面量；
+ * 断点按 §9.8：<768 手机 / 768–1024 平板 / >1024 桌面（设计以 1280 为准）。
+ *
+ * 375 不横向滚动的做法：所有网格列都用 `minmax(0, 1fr)`，行容器 `min-width: 0`，
+ * 长路径 / 长 URL 用 `overflow-wrap: anywhere`（`data/private` 那种长绝对路径在手机上
+ * 一定会超宽，靠 ellipsis 会藏掉信息，这里选择折行）。
+ */
+
+.settings-page {
+  /* 68ch 装不下「标签 + 输入」两列；上限取 880px，1280 下留白仍然够 */
+  max-width: 880px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  overflow-x: clip;
+}
+
+.settings-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------------ 分组容器 */
+
+.settings-section {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+}
+
+.settings-section--skeleton {
+  gap: var(--space-3);
+}
+
+.settings-section__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.settings-section__heading {
+  min-width: 0;
+}
+
+.settings-section__title {
+  font-size: var(--font-size-title);
+}
+
+.settings-section__desc {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--font-size-body-sm);
+}
+
+.settings-section__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.settings-section__badges {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.settings-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.settings-section__foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------------------ 行 */
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  min-width: 0;
+}
+
+.settings-row__meta {
+  min-width: 0;
+}
+
+.settings-row__label {
+  /* 输入框 36px 高、标签 14px/1.7：补 8px 让两列基线看起来齐平 */
+  display: inline-block;
+  padding-top: 8px;
+  color: var(--text);
+  font-size: var(--font-size-body-sm);
+  font-weight: 500;
+}
+
+.settings-row__control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* 行里的按钮不跟着拉伸（Grid/Flex 子项默认 stretch，整行宽的按钮很怪）；输入框仍占满 */
+.settings-row__control > .ui-btn {
+  align-self: flex-start;
+}
+
+.settings-row__hint,
+.settings-row__note,
+.settings-row__error {
+  font-size: 12px;
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
+}
+
+.settings-row__hint {
+  color: var(--text-muted);
+}
+
+.settings-row__note {
+  color: var(--text);
+}
+
+.settings-row__note--muted {
+  color: var(--text-muted);
+}
+
+.settings-row__error {
+  color: var(--danger);
+}
+
+/* -------------------------------------------------------------- 提示条 */
+
+.settings-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-body-sm);
+  min-width: 0;
+}
+
+.settings-notice__body {
+  min-width: 0;
+}
+
+.settings-notice__title {
+  font-weight: 600;
+}
+
+.settings-notice__text {
+  margin-top: 2px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.settings-notice__text p + p {
+  margin-top: var(--space-1);
+}
+
+.settings-notice__action {
+  flex: none;
+}
+
+.settings-notice--info {
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 24%, var(--border));
+}
+
+.settings-notice--success {
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
+}
+
+.settings-notice--warn {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+}
+
+.settings-notice--danger {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--border));
+}
+
+/* ---------------------------------------------------------- 探针结果 */
+
+.settings-test {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font-size: 12px;
+  line-height: var(--line-height-tight);
+}
+
+.settings-test--ok {
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 26%, var(--border));
+}
+
+.settings-test--fail {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 26%, var(--border));
+}
+
+.settings-test--pending {
+  color: var(--text-muted);
+}
+
+.settings-test__label {
+  font-weight: 600;
+}
+
+.settings-test__meta {
+  color: var(--text-muted);
+}
+
+.settings-test__code {
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+
+/* ------------------------------------------------------------ 索引进度 */
+
+.settings-index {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.settings-index__line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.settings-index__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.settings-index__version {
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.settings-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.settings-subsection__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-title-sm);
+}
+
+.settings-subsection__desc {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.settings-subsection__note {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------ 扫描结果 */
+
+.settings-scan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.settings-scan__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--font-size-body-sm);
+  font-weight: 500;
+}
+
+.settings-scan__meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.settings-scan__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.settings-scan__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.settings-scan__cell dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.settings-scan__cell dd {
+  margin: 0;
+  font-size: var(--font-size-title-sm);
+  font-weight: 600;
+}
+
+.settings-scan__cell.is-add {
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+}
+
+.settings-scan__cell.is-warn {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+
+.settings-scan__root {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.settings-scan__root code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.settings-scan__errors summary {
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-scan__errors ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.settings-scan__errors code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- 其它 */
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.settings-subsection .settings-actions {
+  justify-content: flex-start;
+}
+
+.settings-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.settings-inline-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* 被禁用的按钮收不到 hover：外面套一层可聚焦的 span 让 Tooltip 能触发（§9.6 Offline） */
+.settings-tooltip-anchor {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.settings-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------ 响应式 */
+
+@media (max-width: 1024px) {
+  .settings-row {
+    grid-template-columns: 160px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .settings-section {
+    padding: var(--space-4);
+  }
+
+  .settings-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+
+  .settings-row__label {
+    padding-top: 0;
+  }
+
+  .settings-scan__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-section__foot,
+  .settings-actions {
+    justify-content: stretch;
+  }
+
+  .settings-section__foot .settings-actions > *,
+  .settings-subsection .settings-actions > * {
+    flex: 1 1 auto;
+  }
+
+  .settings-notice {
+    flex-direction: column;
+  }
+}

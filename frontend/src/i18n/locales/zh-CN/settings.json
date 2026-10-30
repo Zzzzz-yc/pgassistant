@@ -1,0 +1,190 @@
+{
+  "title": "设置",
+  "subtitle": "模型、语义检索、私有资料与通用选项；改动按 Section 分别保存。",
+  "unsaved": "有未保存的改动",
+  "footer": "密钥存储后端：{{backend}}（keyring = 系统凭据库，file = 本地 0600 文件）",
+  "state": {
+    "loading": "正在读取设置…",
+    "loadingSlow": "仍在加载…",
+    "configured": "已配置",
+    "unconfigured": "未配置",
+    "enabled": "已启用",
+    "disabled": "未启用"
+  },
+  "test": {
+    "action": "测试连接",
+    "running": "正在测试…",
+    "pending": "正在探测上游…",
+    "ok": "连接正常",
+    "failed": "连接失败",
+    "failedFallback": "上游没有返回可用结果",
+    "requestFailed": "请求失败",
+    "latency": "{{ms}} ms",
+    "model": "模型 {{model}}"
+  },
+  "secret": {
+    "keyring": "已存入系统凭据库",
+    "file": "已存入本地文件（不建议）"
+  },
+  "model": {
+    "title": "模型",
+    "description": "助手对话与计划生成使用的 LLM。密钥只写不读，保存后只显示掩码。",
+    "baseUrl": {
+      "label": "Base URL",
+      "hint": "例如 https://api.deepseek.com/v1",
+      "required": "Base URL 不能为空",
+      "invalid": "必须以 http:// 或 https:// 开头"
+    },
+    "model": {
+      "label": "模型",
+      "hint": "例如 deepseek-chat",
+      "required": "模型名不能为空"
+    },
+    "apiKey": {
+      "label": "API Key",
+      "hint": "只写不读：留空表示保持原值，保存后只显示掩码",
+      "placeholder": "未配置",
+      "invalid": "密钥至少 8 个字符",
+      "current": "当前密钥：{{masked}}",
+      "none": "当前未配置密钥"
+    },
+    "temperature": {
+      "label": "温度",
+      "hint": "0–2，越低越稳定；默认 0.3"
+    },
+    "maxTokens": {
+      "label": "最大输出 token",
+      "hint": "256–8192，默认 1024",
+      "invalid": "需要 256–8192 之间的整数"
+    },
+    "save": "保存模型设置",
+    "saved": "模型设置已保存",
+    "saveFailed": "模型设置保存失败",
+    "testHint": "用当前表单里的配置发一条 1 token 探针（不落库）"
+  },
+  "embedding": {
+    "title": "语义检索",
+    "description": "向量检索的 embedding 配置；未配置时检索自动退回关键词（FTS），助手不受影响。",
+    "unconfigured": {
+      "title": "语义检索未启用",
+      "body": "当前检索只走关键词（FTS）。配好 embedding 并保存后，服务端会在后台重建向量。"
+    },
+    "baseUrl": {
+      "label": "Base URL",
+      "hint": "例如 https://api.openai.com/v1 或任意兼容 OpenAI 的地址",
+      "required": "Base URL 不能为空",
+      "invalid": "必须以 http:// 或 https:// 开头"
+    },
+    "model": {
+      "label": "模型",
+      "hint": "例如 text-embedding-3-small",
+      "required": "模型名不能为空"
+    },
+    "dim": {
+      "label": "维度",
+      "hint": "留空则由第一次探针的返回自动回填",
+      "placeholder": "自动",
+      "invalid": "维度需要 1–8192 之间的整数"
+    },
+    "apiKey": {
+      "label": "API Key",
+      "hint": "只写不读：留空表示保持原值",
+      "invalid": "密钥至少 8 个字符"
+    },
+    "save": "保存并重建向量",
+    "saved": "语义检索设置已保存，向量将在后台重建",
+    "saveFailed": "语义检索设置保存失败",
+    "testHint": "用当前表单里的配置请求一次 embedding（不落库）"
+  },
+  "index": {
+    "title": "索引",
+    "description": "把 content/ 与私有资料重新扫进数据库；重建期间进度每秒刷新一次。",
+    "full": "全量重建",
+    "incremental": "增量更新",
+    "waiting": "正在等待任务状态…",
+    "running": "正在建立索引",
+    "files": "{{done}} / {{total}} 个文件",
+    "done": "索引已就绪",
+    "doneToast": "索引重建完成，共 {{total}} 个文件",
+    "failed": "上次重建失败",
+    "failedFallback": "任务以失败结束，可再点一次全量重建",
+    "failedToast": "重建索引失败",
+    "started": "已开始重建索引",
+    "building": "已有任务在跑，已开始跟踪它的进度",
+    "rateLimited": "重建太频繁，{{seconds}} 秒后可再试",
+    "rateLimitedHint": "重建索引限 1 次 / 5 分钟（§7.10）；倒计时结束后按钮自动恢复。",
+    "note": "全量重建只重建 content/ 的索引；私有资料（data/private）请在下方「私有资料」里重新扫描。",
+    "lastIndexed": "上次索引：{{time}}",
+    "never": "还没有索引记录"
+  },
+  "private": {
+    "title": "私有资料",
+    "description": "把你自己的 markdown 放进 data/private，重扫后即可在资料库里检索（不进公开内容包）。",
+    "custom": "自定义目录",
+    "defaultDir": "默认目录",
+    "dir": {
+      "label": "目录",
+      "hint": "填写 data/private 内的绝对路径；留空并保存 = 恢复默认 data/private",
+      "placeholder": "D:\\pgassistant\\data\\private",
+      "invalid": "请输入绝对路径（例如 D:\\pgassistant\\data\\private）"
+    },
+    "save": "保存目录",
+    "saved": "私有资料目录已保存",
+    "saveFailed": "私有资料目录保存失败",
+    "rescan": "重新扫描",
+    "scanning": "正在扫描…",
+    "scanFailed": "重新扫描失败",
+    "scanned": "扫描完成：新增 {{added}}，更新 {{updated}}",
+    "result": {
+      "title": "最近一次扫描",
+      "empty": "还没有扫描记录；保存目录后点「重新扫描」。",
+      "scanned": "扫描 {{count}} 个文件",
+      "took": "耗时 {{ms}} ms",
+      "added": "新增",
+      "updated": "更新",
+      "removed": "删除",
+      "skipped": "跳过",
+      "root": "目录",
+      "errors": "{{count}} 个文件有错误（已跳过）"
+    }
+  },
+  "general": {
+    "title": "通用",
+    "description": "语言、端口、代码运行开关与数据管理。",
+    "language": {
+      "label": "语言",
+      "hint": "切换立即生效，同时写入设置",
+      "zh": "简体中文",
+      "en": "English",
+      "saving": "正在写入设置…",
+      "saved": "语言已保存",
+      "failed": "语言保存失败，已回退"
+    },
+    "port": {
+      "label": "端口",
+      "hint": "端口由启动脚本在 8000–8010 内自动选择，本页只读",
+      "restart": "重启生效"
+    },
+    "runner": {
+      "label": "启用代码运行",
+      "hint": "关闭后算法页的站内运行入口全部隐藏，其它功能不受影响；同时写入 localStorage.runner_enabled",
+      "saved": "代码运行开关已保存",
+      "failed": "代码运行开关保存失败，已回退"
+    },
+    "reset": {
+      "label": "数据重置",
+      "hint": "清空学习计划与索引数据（需输入 DELETE 二次确认）",
+      "action": "清空数据",
+      "unavailable": "暂未开放：后端还没有清空数据的端点，本版本不提供该操作。"
+    }
+  },
+  "partial": {
+    "title": "语义检索不可用时的行为",
+    "body": "检索照常返回关键词结果，语义检索只作为排序增强；助手的计划生成不受影响。"
+  },
+  "error": {
+    "loadTitle": "设置读取失败",
+    "offlineTitle": "连不上本地服务",
+    "offline": "后端不可用：模型相关的测试与保存按钮已禁用，其余设置只读。"
+  }
+}

@@ -15,6 +15,9 @@
  *
  * M4 增补（助手模块）：新增 `assistant` 命名空间 + `locales/<lang>/assistant.json`
  * （对话页的意图标签、能力边界、错误动作、计划草稿卡文案），同样只加行、不改既有键。
+ *
+ * M5 增补（打磨模块）：新增 `settings` 命名空间 + `locales/<lang>/settings.json`
+ * （设置页四个 Section 的标签、探针结果、索引进度与扫描结果文案），同样只加行、不改既有键。
  */
 import i18n, { type Resource } from "i18next";
 import { initReactI18next, useTranslation } from "react-i18next";
@@ -27,17 +30,27 @@ import enErrors from "./locales/en-US/errors.json";
 import enLibrary from "./locales/en-US/library.json";
 import enNav from "./locales/en-US/nav.json";
 import enPlans from "./locales/en-US/plans.json";
+import enSettings from "./locales/en-US/settings.json";
 import zhAssistant from "./locales/zh-CN/assistant.json";
 import zhCommon from "./locales/zh-CN/common.json";
 import zhErrors from "./locales/zh-CN/errors.json";
 import zhLibrary from "./locales/zh-CN/library.json";
 import zhNav from "./locales/zh-CN/nav.json";
 import zhPlans from "./locales/zh-CN/plans.json";
+import zhSettings from "./locales/zh-CN/settings.json";
 
 export const LANG_STORAGE_KEY = "pg_lang";
 export const DEFAULT_LOCALE: Locale = "zh-CN";
 export const SUPPORTED_LOCALES: readonly Locale[] = ["zh-CN", "en-US"];
-export const NAMESPACES = ["common", "nav", "errors", "plans", "library", "assistant"] as const;
+export const NAMESPACES = [
+  "common",
+  "nav",
+  "errors",
+  "plans",
+  "library",
+  "assistant",
+  "settings",
+] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 
 const resources: Resource = {
@@ -48,6 +61,7 @@ const resources: Resource = {
     plans: zhPlans,
     library: zhLibrary,
     assistant: zhAssistant,
+    settings: zhSettings,
   },
   "en-US": {
     common: enCommon,
@@ -56,6 +70,7 @@ const resources: Resource = {
     plans: enPlans,
     library: enLibrary,
     assistant: enAssistant,
+    settings: enSettings,
   },
 };
 

@@ -1,0 +1,190 @@
+{
+  "title": "Settings",
+  "subtitle": "Model, semantic search, private materials and general options; each section saves on its own.",
+  "unsaved": "Unsaved changes",
+  "footer": "Secret backend: {{backend}} (keyring = OS credential store, file = local 0600 file)",
+  "state": {
+    "loading": "Loading settings…",
+    "loadingSlow": "Still loading…",
+    "configured": "Configured",
+    "unconfigured": "Not configured",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "test": {
+    "action": "Test connection",
+    "running": "Testing…",
+    "pending": "Probing upstream…",
+    "ok": "Connected",
+    "failed": "Connection failed",
+    "failedFallback": "Upstream returned nothing usable",
+    "requestFailed": "Request failed",
+    "latency": "{{ms}} ms",
+    "model": "model {{model}}"
+  },
+  "secret": {
+    "keyring": "Stored in OS credential store",
+    "file": "Stored in local file (not recommended)"
+  },
+  "model": {
+    "title": "Model",
+    "description": "The LLM used by chat and plan generation. The key is write-only: only a mask is ever shown.",
+    "baseUrl": {
+      "label": "Base URL",
+      "hint": "e.g. https://api.deepseek.com/v1",
+      "required": "Base URL is required",
+      "invalid": "Must start with http:// or https://"
+    },
+    "model": {
+      "label": "Model",
+      "hint": "e.g. deepseek-chat",
+      "required": "Model name is required"
+    },
+    "apiKey": {
+      "label": "API key",
+      "hint": "Write-only: leave blank to keep the current key; only a mask is shown afterwards",
+      "placeholder": "Not configured",
+      "invalid": "Key must be at least 8 characters",
+      "current": "Current key: {{masked}}",
+      "none": "No key configured"
+    },
+    "temperature": {
+      "label": "Temperature",
+      "hint": "0–2, lower is steadier; default 0.3"
+    },
+    "maxTokens": {
+      "label": "Max output tokens",
+      "hint": "256–8192, default 1024",
+      "invalid": "Must be an integer between 256 and 8192"
+    },
+    "save": "Save model",
+    "saved": "Model settings saved",
+    "saveFailed": "Saving model settings failed",
+    "testHint": "Send a 1-token probe using the values in this form (nothing is stored)"
+  },
+  "embedding": {
+    "title": "Semantic search",
+    "description": "Embedding config for vector search. Without it, search falls back to keyword (FTS) and the assistant is unaffected.",
+    "unconfigured": {
+      "title": "Semantic search is off",
+      "body": "Search currently uses keywords (FTS) only. Once embeddings are configured and saved, vectors rebuild in the background."
+    },
+    "baseUrl": {
+      "label": "Base URL",
+      "hint": "e.g. https://api.openai.com/v1 or any OpenAI-compatible endpoint",
+      "required": "Base URL is required",
+      "invalid": "Must start with http:// or https://"
+    },
+    "model": {
+      "label": "Model",
+      "hint": "e.g. text-embedding-3-small",
+      "required": "Model name is required"
+    },
+    "dim": {
+      "label": "Dimension",
+      "hint": "Leave blank to let the first probe fill it in",
+      "placeholder": "auto",
+      "invalid": "Dimension must be an integer between 1 and 8192"
+    },
+    "apiKey": {
+      "label": "API key",
+      "hint": "Write-only: leave blank to keep the current key",
+      "invalid": "Key must be at least 8 characters"
+    },
+    "save": "Save and rebuild vectors",
+    "saved": "Semantic search settings saved; vectors rebuild in the background",
+    "saveFailed": "Saving semantic search settings failed",
+    "testHint": "Request one embedding with the values in this form (nothing is stored)"
+  },
+  "index": {
+    "title": "Index",
+    "description": "Rescan content/ and private materials into the database; progress refreshes every second while running.",
+    "full": "Full rebuild",
+    "incremental": "Incremental update",
+    "waiting": "Waiting for task status…",
+    "running": "Building index",
+    "files": "{{done}} / {{total}} files",
+    "done": "Index ready",
+    "doneToast": "Index rebuilt: {{total}} files",
+    "failed": "Last rebuild failed",
+    "failedFallback": "The task ended in failure; try a full rebuild again",
+    "failedToast": "Index rebuild failed",
+    "started": "Index rebuild started",
+    "building": "A task is already running; tracking its progress",
+    "rateLimited": "Too frequent, retry in {{seconds}}s",
+    "rateLimitedHint": "Rebuilds are limited to once every 5 minutes (§7.10); the buttons re-enable when the countdown ends.",
+    "note": "A full rebuild only reindexes content/; rescan private materials (data/private) in the Private materials section below.",
+    "lastIndexed": "Last indexed: {{time}}",
+    "never": "No index run yet"
+  },
+  "private": {
+    "title": "Private materials",
+    "description": "Drop your own markdown into data/private, rescan, and it becomes searchable (it never enters the public content pack).",
+    "custom": "Custom folder",
+    "defaultDir": "Default folder",
+    "dir": {
+      "label": "Folder",
+      "hint": "An absolute path inside data/private; save an empty value to restore the default data/private",
+      "placeholder": "D:\\pgassistant\\data\\private",
+      "invalid": "Enter an absolute path (e.g. D:\\pgassistant\\data\\private)"
+    },
+    "save": "Save folder",
+    "saved": "Private folder saved",
+    "saveFailed": "Saving the private folder failed",
+    "rescan": "Rescan",
+    "scanning": "Scanning…",
+    "scanFailed": "Rescan failed",
+    "scanned": "Scan complete: {{added}} added, {{updated}} updated",
+    "result": {
+      "title": "Last scan",
+      "empty": "No scan yet; save a folder and press Rescan.",
+      "scanned": "scanned {{count}} files",
+      "took": "took {{ms}} ms",
+      "added": "Added",
+      "updated": "Updated",
+      "removed": "Removed",
+      "skipped": "Skipped",
+      "root": "Folder",
+      "errors": "{{count}} files had errors (skipped)"
+    }
+  },
+  "general": {
+    "title": "General",
+    "description": "Language, port, code runner switch and data management.",
+    "language": {
+      "label": "Language",
+      "hint": "Applies immediately and is written to settings",
+      "zh": "简体中文",
+      "en": "English",
+      "saving": "Writing settings…",
+      "saved": "Language saved",
+      "failed": "Saving the language failed; reverted"
+    },
+    "port": {
+      "label": "Port",
+      "hint": "The start script picks a port in 8000–8010; this page is read-only",
+      "restart": "Takes effect after restart"
+    },
+    "runner": {
+      "label": "Enable code runner",
+      "hint": "When off, in-page run entry points on algorithm pages are hidden; nothing else changes. Also written to localStorage.runner_enabled",
+      "saved": "Code runner switch saved",
+      "failed": "Saving the code runner switch failed; reverted"
+    },
+    "reset": {
+      "label": "Reset data",
+      "hint": "Wipe plans and index data (requires typing DELETE)",
+      "action": "Wipe data",
+      "unavailable": "Not available: the backend has no wipe endpoint yet, so this version does not offer the action."
+    }
+  },
+  "partial": {
+    "title": "Behaviour without semantic search",
+    "body": "Search still returns keyword results; vectors only refine ranking, and plan generation is unaffected."
+  },
+  "error": {
+    "loadTitle": "Could not load settings",
+    "offlineTitle": "Local service unreachable",
+    "offline": "The backend is unavailable: model test/save buttons are disabled and other settings are read-only."
+  }
+}
