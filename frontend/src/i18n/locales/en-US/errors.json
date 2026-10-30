@@ -1,0 +1,142 @@
+{
+  "BAD_HOST": {
+    "message": "Page state is invalid. Reopen it from the launcher.",
+    "action": "Show the start command"
+  },
+  "BAD_ORIGIN": {
+    "message": "Page state is invalid. Reopen it from the launcher.",
+    "action": "Show the start command"
+  },
+  "MISSING_ORIGIN": {
+    "message": "Page state is invalid. Reopen it from the launcher.",
+    "action": "Show the start command"
+  },
+  "CROSS_SITE": {
+    "message": "Page state is invalid. Reopen it from the launcher.",
+    "action": "Show the start command"
+  },
+  "TOKEN_MISSING": {
+    "message": "Page state is invalid. Reopen it from the launcher.",
+    "action": "Show the start command"
+  },
+  "TOKEN_INVALID": {
+    "message": "The service restarted. Please reload the page.",
+    "action": "Reload"
+  },
+  "RESOURCE_NOT_FOUND": {
+    "message": "This resource does not exist or was removed.",
+    "action": "Back to the library"
+  },
+  "DB_NOT_READY": {
+    "message": "The database is not built yet.",
+    "action": "Run bootstrap_index.py first"
+  },
+  "SCHEMA_TOO_NEW": {
+    "message": "The database is newer than this build, so startup was refused.",
+    "action": "Update the app or restore a backup"
+  },
+  "INTERNAL": {
+    "message": "Something went wrong.",
+    "action": "Copy error details (with request_id)"
+  },
+  "NOT_FOUND": {
+    "message": "This page or endpoint does not exist.",
+    "action": "Back to home"
+  },
+  "BAD_REQUEST": {
+    "message": "The request is invalid.",
+    "action": "Check the input and retry"
+  },
+  "VALIDATION_ERROR": {
+    "message": "Some input is invalid.",
+    "action": "Highlight the offending field"
+  },
+  "PLAN_NOT_FOUND": {
+    "message": "This plan does not exist or was deleted.",
+    "action": "Back to the plan list"
+  },
+  "STAGE_NOT_FOUND": {
+    "message": "This stage does not exist.",
+    "action": "Refresh the plan and retry"
+  },
+  "ITEM_NOT_FOUND": {
+    "message": "This item does not exist or was deleted.",
+    "action": "Refresh the plan and retry"
+  },
+  "PLAN_TEMPLATE_NOT_FOUND": {
+    "message": "This template does not exist.",
+    "action": "Generate without a template"
+  },
+  "TASK_NOT_FOUND": {
+    "message": "No such index task.",
+    "action": "Start a new rebuild"
+  },
+  "VERSION_CONFLICT": {
+    "message": "This plan was updated elsewhere.",
+    "action": "Refresh and retry"
+  },
+  "INDEX_BUILDING": {
+    "message": "The index is being rebuilt.",
+    "action": "Progress bar"
+  },
+  "INDEX_FAILED": {
+    "message": "The last index rebuild failed.",
+    "action": "Read the reason and retry"
+  },
+  "PLAN_INVALID": {
+    "message": "The generated plan failed validation.",
+    "action": "Retry with another description, or create it manually"
+  },
+  "PATH_FORBIDDEN": {
+    "message": "The private path escapes its root.",
+    "action": "Keep the path inside data/private"
+  },
+  "PRIVATE_DIR_INVALID": {
+    "message": "The private folder is not usable.",
+    "action": "Pick an existing readable folder"
+  },
+  "RATE_LIMITED": {
+    "message": "Too many requests.",
+    "action": "Wait a few seconds"
+  },
+  "LLM_NOT_CONFIGURED": {
+    "message": "No model is configured.",
+    "action": "Open settings"
+  },
+  "NO_EMBEDDING": {
+    "message": "Semantic search is not configured.",
+    "action": "Open settings"
+  },
+  "LLM_401": {
+    "message": "The API key is invalid or expired.",
+    "action": "Open settings"
+  },
+  "LLM_429": {
+    "message": "Too many requests. Retry in 30 seconds.",
+    "action": "Disable the button with a countdown"
+  },
+  "LLM_TIMEOUT": {
+    "message": "The model timed out.",
+    "action": "Retry button (no automatic retry)"
+  },
+  "LLM_UNAVAILABLE": {
+    "message": "The model service is unavailable.",
+    "action": "Check proxy and network"
+  },
+  "LLM_BAD_OUTPUT": {
+    "message": "The model output could not be parsed.",
+    "action": "Rephrase and retry"
+  },
+  "NETWORK_ERROR": {
+    "message": "Cannot reach the local service.",
+    "action": "Make sure start.ps1 is still running"
+  },
+  "SSE_PARSE_ERROR": {
+    "message": "Failed to parse the event stream.",
+    "action": "Retry once"
+  },
+  "UNKNOWN": {
+    "message": "Something went wrong.",
+    "action": "Copy error details (with request_id)"
+  }
+}

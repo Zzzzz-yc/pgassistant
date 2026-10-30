@@ -1,0 +1,39 @@
+{
+  "app": {
+    "name": "pgassistant",
+    "tagline": "本地学习资料库"
+  },
+  "action": {
+    "retry": "重试",
+    "reload": "重新加载",
+    "copy": "复制",
+    "copied": "已复制",
+    "close": "关闭",
+    "dismiss": "知道了",
+    "cancel": "取消",
+    "confirm": "确认",
+    "backHome": "回到首页",
+    "openSettings": "去设置",
+    "skipToContent": "跳到正文"
+  },
+  "state": {
+    "loading": "加载中…",
+    "loadingSlow": "仍在加载…",
+    "empty": "这里还什么都没有",
+    "error": "出了点问题"
+  },
+  "error": {
+    "title": "页面出错了",
+    "reloadHint": "服务已重启，请重新加载页面",
+    "copyDetail": "复制错误详情",
+    "boundaryHint": "页面渲染时出现异常；刷新后仍然失败请把下面的详情发给开发者。"
+  },
+  "palette": {
+    "placeholder": "搜索资料、计划与命令",
+    "hint": "按 Esc 关闭",
+    "empty": "命令面板的正式实现由组件库（M2）提供，M0 只提供 Ctrl/⌘+K 的挂载点。"
+  },
+  "toast": {
+    "reloadRequired": "服务已重启，请重新加载页面"
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "BAD_HOST": {
+    "message": "页面状态异常，请从启动器重新打开",
+    "action": "显示启动命令"
+  },
+  "BAD_ORIGIN": {
+    "message": "页面状态异常，请从启动器重新打开",
+    "action": "显示启动命令"
+  },
+  "MISSING_ORIGIN": {
+    "message": "页面状态异常，请从启动器重新打开",
+    "action": "显示启动命令"
+  },
+  "CROSS_SITE": {
+    "message": "页面状态异常，请从启动器重新打开",
+    "action": "显示启动命令"
+  },
+  "TOKEN_MISSING": {
+    "message": "页面状态异常，请从启动器重新打开",
+    "action": "显示启动命令"
+  },
+  "TOKEN_INVALID": {
+    "message": "服务已重启，请重新加载页面",
+    "action": "重新加载"
+  },
+  "RESOURCE_NOT_FOUND": {
+    "message": "资料不存在或已下架",
+    "action": "返回资料库"
+  },
+  "DB_NOT_READY": {
+    "message": "数据库还没建好",
+    "action": "先运行 bootstrap_index.py"
+  },
+  "SCHEMA_TOO_NEW": {
+    "message": "数据库版本比程序新，已拒绝启动",
+    "action": "更新程序或恢复备份"
+  },
+  "INTERNAL": {
+    "message": "出了点问题",
+    "action": "复制错误详情（含 request_id）"
+  },
+  "NOT_FOUND": {
+    "message": "页面或接口不存在",
+    "action": "回到首页"
+  },
+  "BAD_REQUEST": {
+    "message": "请求不合法",
+    "action": "检查输入后重试"
+  },
+  "VALIDATION_ERROR": {
+    "message": "输入有误",
+    "action": "高亮出错字段"
+  },
+  "PLAN_NOT_FOUND": {
+    "message": "计划不存在或已删除",
+    "action": "返回计划列表"
+  },
+  "STAGE_NOT_FOUND": {
+    "message": "阶段不存在",
+    "action": "刷新计划后重试"
+  },
+  "ITEM_NOT_FOUND": {
+    "message": "条目不存在或已删除",
+    "action": "刷新计划后重试"
+  },
+  "PLAN_TEMPLATE_NOT_FOUND": {
+    "message": "模板不存在",
+    "action": "改为自动生成"
+  },
+  "TASK_NOT_FOUND": {
+    "message": "找不到这个索引任务",
+    "action": "重新发起重建"
+  },
+  "VERSION_CONFLICT": {
+    "message": "这个计划已在别处更新",
+    "action": "刷新后重试"
+  },
+  "INDEX_BUILDING": {
+    "message": "正在建立索引",
+    "action": "进度条"
+  },
+  "INDEX_FAILED": {
+    "message": "上一次索引重建失败了",
+    "action": "查看原因后重试"
+  },
+  "PLAN_INVALID": {
+    "message": "生成的计划未通过校验",
+    "action": "换描述重试 / 手动创建"
+  },
+  "PATH_FORBIDDEN": {
+    "message": "私有资料路径越界",
+    "action": "把路径放在 data/private 内"
+  },
+  "PRIVATE_DIR_INVALID": {
+    "message": "私有资料目录不可用",
+    "action": "换一个存在且可读的目录"
+  },
+  "RATE_LIMITED": {
+    "message": "请求太频繁",
+    "action": "稍等几秒再试"
+  },
+  "LLM_NOT_CONFIGURED": {
+    "message": "未配置模型",
+    "action": "跳设置页"
+  },
+  "NO_EMBEDDING": {
+    "message": "未配置语义检索",
+    "action": "跳设置页"
+  },
+  "LLM_401": {
+    "message": "密钥无效或已过期",
+    "action": "跳设置页"
+  },
+  "LLM_429": {
+    "message": "请求太频繁，请 30 秒后再试",
+    "action": "倒计时禁用按钮"
+  },
+  "LLM_TIMEOUT": {
+    "message": "模型响应超时",
+    "action": "重试按钮（不会自动重试）"
+  },
+  "LLM_UNAVAILABLE": {
+    "message": "模型服务不可用",
+    "action": "检查代理 / 网络"
+  },
+  "LLM_BAD_OUTPUT": {
+    "message": "模型输出无法解析",
+    "action": "换个说法重试"
+  },
+  "NETWORK_ERROR": {
+    "message": "连不上本地服务",
+    "action": "确认 start.ps1 还在运行"
+  },
+  "SSE_PARSE_ERROR": {
+    "message": "流式响应解析失败",
+    "action": "重试一次"
+  },
+  "UNKNOWN": {
+    "message": "出了点问题",
+    "action": "复制错误详情（含 request_id）"
+  }
+}

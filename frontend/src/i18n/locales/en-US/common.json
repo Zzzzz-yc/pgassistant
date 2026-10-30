@@ -1,0 +1,39 @@
+{
+  "app": {
+    "name": "pgassistant",
+    "tagline": "Local learning library"
+  },
+  "action": {
+    "retry": "Retry",
+    "reload": "Reload",
+    "copy": "Copy",
+    "copied": "Copied",
+    "close": "Close",
+    "dismiss": "Got it",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "backHome": "Back to home",
+    "openSettings": "Open settings",
+    "skipToContent": "Skip to content"
+  },
+  "state": {
+    "loading": "Loading…",
+    "loadingSlow": "Still loading…",
+    "empty": "Nothing here yet",
+    "error": "Something went wrong"
+  },
+  "error": {
+    "title": "This page failed",
+    "reloadHint": "The service restarted. Please reload the page.",
+    "copyDetail": "Copy error details",
+    "boundaryHint": "The page threw while rendering. Reload first; if it keeps failing, share the details below."
+  },
+  "palette": {
+    "placeholder": "Search resources, plans and commands",
+    "hint": "Press Esc to close",
+    "empty": "The real command palette ships with the component library (M2). M0 only provides the Ctrl/⌘+K mount point."
+  },
+  "toast": {
+    "reloadRequired": "The service restarted. Please reload the page."
+  }
+}

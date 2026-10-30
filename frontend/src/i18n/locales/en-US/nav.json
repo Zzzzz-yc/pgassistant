@@ -1,0 +1,18 @@
+{
+  "brand": "pgassistant",
+  "home": "Home",
+  "library": "Library",
+  "plans": "Plans",
+  "assistant": "Assistant",
+  "settings": "Settings",
+  "search": "Search",
+  "searchTrigger": "Search resources, plans and commands",
+  "openSearch": "Open search",
+  "toggleSidebar": "Collapse or expand sidebar",
+  "openMenu": "Open menu",
+  "chapters": "Chapters",
+  "chaptersHint": "No active plan, so the sidebar lists chapters by stack.",
+  "planTreeSlot": "Plan tree slot",
+  "planTreeHint": "M3 injects the active plan's stages and items here.",
+  "noTaxonomy": "Taxonomy is not available yet"
+}

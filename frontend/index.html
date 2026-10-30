@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>pgassistant</title>
+    <!-- 令牌 meta 不写在这里：生产态由 backend/app/middleware/guard.py 注入，
+         dev 态由 vite.config.ts 的插件注入。前端只从 meta 读，禁止 URL/Cookie/localStorage。 -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>pgassistant 需要启用 JavaScript 才能运行。</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "brand": "pgassistant",
+  "home": "首页",
+  "library": "资料库",
+  "plans": "计划",
+  "assistant": "助手",
+  "settings": "设置",
+  "search": "搜索",
+  "searchTrigger": "搜索资料、计划与命令",
+  "openSearch": "打开搜索",
+  "toggleSidebar": "折叠或展开侧栏",
+  "openMenu": "打开菜单",
+  "chapters": "章节树",
+  "chaptersHint": "当前没有激活计划，侧栏按技术栈列出章节。",
+  "planTreeSlot": "计划树插槽",
+  "planTreeHint": "M3 在这里注入当前激活计划的阶段与条目。",
+  "noTaxonomy": "分类树还没加载出来"
+}

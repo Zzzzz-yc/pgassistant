@@ -1,0 +1,86 @@
+/*
+ * Design tokens —— 需求文档 §9.3 的唯一落地点。
+ *
+ * 铁律（docs/contracts/MODULES.md §1.2）：**任何模块不得硬编码色值**。
+ * 页面与组件只用 var(--…) 或 Tailwind 里映射到这些变量的类名；
+ * 要换主题只改本文件。
+ */
+
+:root {
+  /* 颜色 ---------------------------------------------------------------- */
+  --bg: #fafaf8;           /* 页面底色 */
+  --surface: #ffffff;      /* 卡片 */
+  --border: #e7e5e0;       /* 1px 分隔线 */
+  --text: #1a1a1a;         /* 正文 */
+  --text-muted: #6b6b66;   /* 次要文字 */
+  --primary: #2f5d50;      /* 墨绿：仅主按钮 / 选中态 / 进度 */
+  --accent: #c8862b;       /* 琥珀：进度强调与难度 */
+  --danger: #b4453a;
+
+  /* 由主色派生的浅色阶（同一色相，不引入新色值语义） */
+  --primary-soft: color-mix(in srgb, var(--primary) 10%, var(--surface));
+  --primary-soft-hover: color-mix(in srgb, var(--primary) 16%, var(--surface));
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  --danger-soft: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  --scrim: color-mix(in srgb, var(--text) 32%, transparent);
+
+  /* 字体 ---------------------------------------------------------------- */
+  /* 系统回退栈：不打包 webfont，离线也能正常显示 */
+  --font-title: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", Georgia,
+    "Times New Roman", serif;
+  --font-body: Inter, "Source Han Sans SC", "Noto Sans CJK SC", "PingFang SC",
+    "Microsoft YaHei", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, "SF Mono", Menlo,
+    "DejaVu Sans Mono", monospace;
+
+  --font-size-body: 16px;       /* 正文 14/16px，基准取 16 */
+  --font-size-body-sm: 14px;
+  --font-size-code: 13px;       /* 代码 13px */
+  --font-size-title-lg: 28px;
+  --font-size-title: 20px;
+  --font-size-title-sm: 16px;
+  --line-height-body: 1.7;
+  --line-height-tight: 1.35;
+  --letter-spacing-title: -0.01em;
+  --weight-title: 600;
+
+  /* 尺度：4pt 体系 ------------------------------------------------------ */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --radius-control: 6px;   /* 控件 */
+  --radius-card: 8px;      /* 卡片 */
+  --radius-pill: 999px;    /* 标签 */
+
+  --container-max: 1100px;
+  --prose-width: 68ch;
+
+  /* 层级 ---------------------------------------------------------------- */
+  --z-sidebar: 10;
+  --z-topbar: 20;
+  --z-dropdown: 30;
+  --z-dialog: 40;
+  --z-toast: 50;
+
+  /* 布局骨架（§9.1：顶栏 56px，侧栏 260px 可折叠为 56px） --------------- */
+  --topbar-height: 56px;
+  --sidebar-width: 260px;
+  --sidebar-width-collapsed: 56px;
+
+  /* 动效：只做 hover 位移 / 淡入 / shimmer，全部 150ms ease-out（§9.2-4） */
+  --transition-fast: 150ms;
+  --transition-easing: ease-out;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* 阴影只用一档极轻的（§9.2-5） */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+  color-scheme: light;
+}

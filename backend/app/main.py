@@ -10,8 +10,10 @@ M-1：本地服务鉴权（Host / Origin / X-App-Token）+ schema 迁移框架�
 from __future__ import annotations
 
 import logging
+import mimetypes
 import sqlite3
 import sys
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -24,6 +26,7 @@ for p in (str(BACKEND), str(PROJECT / ".deps")):
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .api import deps, pages, resources, search, taxonomy
@@ -35,6 +38,28 @@ from .middleware.guard import SecurityGuard
 
 APP_VERSION = "0.2.0"
 log = logging.getLogger("pgassistant")
+
+#: 前端构建产物里出现的扩展名 → MIME。
+#: Windows 的注册表常把 `.js` 报成 `text/plain`，浏览器会直接拒绝执行 module script
+#: （"Expected a JavaScript module script but ... MIME type of text/plain"），
+#: 所以这里显式钉死，只影响本进程，不改系统设置。
+STATIC_MIME_TYPES = {
+    ".js": "text/javascript",
+    ".mjs": "text/javascript",
+    ".css": "text/css",
+    ".json": "application/json",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+    ".woff2": "font/woff2",
+}
+
+
+def _register_static_mime_types() -> None:
+    for suffix, mime in STATIC_MIME_TYPES.items():
+        mimetypes.add_type(mime, suffix)
+
+
+_register_static_mime_types()
 
 # 一次性令牌：每进程一枚，不持久化、不落盘（§13.7）
 APP_TOKEN = new_token()
@@ -95,10 +120,40 @@ app.add_middleware(
 # 最后添加 = 最外层：Host 不合法时连 CORS 预处理都不给
 app.add_middleware(SecurityGuard, policy=POLICY)
 
-app.include_router(pages.router)
 app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(resources.router, prefix="/api", tags=["resources"])
 app.include_router(taxonomy.router, prefix="/api", tags=["taxonomy"])
+
+
+class AssetsMount:
+    """`/assets` 的静态托管，目录**每次请求**解析。
+
+    为什么不用 `app.mount("/assets", StaticFiles(directory=...))`：
+    `StaticFiles` 在构造时把目录焊死，而 M0 的测试要用 tmp 目录造一个假 dist，
+    构建产物也可能是服务起来之后才生成的。这里按当前 `pages.dist_dir()` 复用一个
+    `StaticFiles` 实例，目录变了就重建（只在目录切换时付一次代价）。
+
+    `check_dir=False`：`frontend/dist` 不存在时不要在建 app 阶段抛错——
+    没有构建产物也必须能起服务、跑测试（`/assets/*` 会老实返回 404）。
+    """
+
+    def __init__(self, dist_getter: Callable[[], Path]) -> None:
+        self._dist_getter = dist_getter
+        self._directory: Path | None = None
+        self._app: StaticFiles | None = None
+
+    async def __call__(self, scope, receive, send):
+        directory = self._dist_getter() / "assets"
+        if self._app is None or directory != self._directory:
+            self._directory = directory
+            self._app = StaticFiles(directory=str(directory), check_dir=False)
+        await self._app(scope, receive, send)
+
+
+# 顺序要求：/api 路由 → /assets 静态 → pages（含 SPA 回退）。
+# SPA 回退是 `/{full_path:path}`，一旦提前注册就会把接口请求吞成 HTML，
+# 所以 `pages.router` 在文件末尾（`/api/health` 之后）才 include。
+app.mount("/assets", AssetsMount(pages.dist_dir), name="assets")
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -156,3 +211,8 @@ def health():
     finally:
         conn.close()
     return payload
+
+
+# 必须最后 include：pages 里含 SPA 回退 `/{full_path:path}`，
+# 提前注册会把 /api/* 与 /api/health 吞成 HTML（见上面的顺序说明）。
+app.include_router(pages.router)
