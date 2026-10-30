@@ -101,8 +101,10 @@ def main():
 
     migration = result.get("migration") or {}
     if migration.get("applied"):
-        print("schema 迁移：v%s → v%s（备份: %s）"
-              % (migration.get("from"), migration.get("to"), migration.get("backup")))
+        backup = migration.get("backup")
+        note = ("备份: %s" % backup) if backup else "新建库，无需备份"
+        print("schema 迁移：v%s → v%s（%s）"
+              % (migration.get("from"), migration.get("to"), note))
     else:
         print("schema 版本：v%s（无需迁移）" % migration.get("to", "?"))
 
