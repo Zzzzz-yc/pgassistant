@@ -2,11 +2,15 @@
  * 路由表（Owner：前端骨架 M0）。
  *
  * **逐行照 docs/contracts/MODULES.md §3.1**，不得自行增删：
- *   /、/library、/library/:slug(*)、/plans、/plans/new、/plans/:planId、
- *   /plans/:planId/items/:slug(*)、/assistant、/settings、*
+ *   /、/library、/library/*、/plans、/plans/new、/plans/:planId、
+ *   /plans/:planId/items/*、/assistant、/settings、*
  *
  * 两条硬规则：
- * 1. 资料用 `:slug(*)`（splat，slug 含 `/`，D2）；计划用整数 `:planId`（D12）。二者不能混。
+ * 1. 资料用 **v6 splat**：路谱写 `library/*` / `plans/:planId/items/*`，
+ *    页面里从 `useParams()["*"]` 取完整 slug（可含 `/`，D2）。
+ *    注意 v6 **不支持** v5 的命名 splat `:slug(*)`——那样写只会匹配一个字面量段，
+ *    `/library/a/b/c` 会掉进 `*` 404（M0 缺陷，已由本文件修正）。
+ *    计划用整数 `:planId`（D12），二者不能混。
  * 2. 页面一律 `React.lazy`：首屏只加载壳，各模块的 chunk 进页才拉。
  */
 import { lazy } from "react";
@@ -34,11 +38,12 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <HomePage /> },
       { path: "library", element: <LibraryPage /> },
-      { path: "library/:slug(*)", element: <ResourcePage /> },
+      // v6 splat：`library/*` 吃掉整段路径，页面用 useParams()["*"] 取 slug
+      { path: "library/*", element: <ResourcePage /> },
       { path: "plans", element: <PlansPage /> },
       { path: "plans/new", element: <NewPlanPage /> },
       { path: "plans/:planId", element: <PlanPage /> },
-      { path: "plans/:planId/items/:slug(*)", element: <PlanItemPage /> },
+      { path: "plans/:planId/items/*", element: <PlanItemPage /> },
       { path: "assistant", element: <AssistantPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <NotFoundPage /> },
