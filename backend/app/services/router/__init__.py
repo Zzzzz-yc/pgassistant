@@ -59,6 +59,16 @@ CLARIFY_EN = (
     "I'm not sure what you need. Pick a direction below, or rephrase your question:"
 )
 
+#: 「只说想学什么」时的**方向性提问**（C2）。不再用上面那句通用的「我不确定」。
+#: 与拒绝话术一样是模块常量：模型不参与生成（§7.7）。
+PLAN_CLARIFY_ZH = (
+    "要不要我帮你排一个学习计划？大概学什么方向、多少周、每周能投入几小时？"
+)
+PLAN_CLARIFY_EN = (
+    "Want me to draft a study plan for you? Which direction are you aiming for, "
+    "roughly how many weeks, and how many hours a week can you put in?"
+)
+
 #: 澄清卡片的可点选项（§7.2 兜底：给 3 个可点选项，最多 3 个）。
 CLARIFY_OPTIONS_ZH = (
     "找资料，例如「有没有讲闭包的文章」",
@@ -70,6 +80,10 @@ CLARIFY_OPTIONS_EN = (
     "Draft a study plan, e.g. \"12-week frontend plan\"",
     "Study advice, e.g. \"Java or Go?\"",
 )
+
+#: 计划方向性提问的第三个选项（前两条要拼方向词，见 `plan_clarify_options`）。
+PLAN_CLARIFY_OPTIONS_ZH_TAIL = "给我学习路线建议"
+PLAN_CLARIFY_OPTIONS_EN_TAIL = "Give me a study roadmap"
 
 
 def _t(zh: str, en: str, locale: str) -> str:
@@ -96,6 +110,31 @@ def clarify_text(locale: str = "zh-CN") -> str:
 def clarify_options(locale: str = "zh-CN") -> list[str]:
     return list(CLARIFY_OPTIONS_EN if (locale or "").lower().startswith("en")
                 else CLARIFY_OPTIONS_ZH)
+
+
+def plan_clarify_text(locale: str = "zh-CN") -> str:
+    """「只说想学什么」的方向性提问（C2，常量话术，不经模型）。"""
+    return _t(PLAN_CLARIFY_ZH, PLAN_CLARIFY_EN, locale)
+
+
+def plan_clarify_options(locale: str = "zh-CN", topic: str = "") -> list[str]:
+    """顺着用户话头的三条可点选项（C2，§7.2 最多 3 个）。
+
+    `topic` 是 `rules.study_topic()` 抽到的方向词（例如「前端」）；抽不到就用通用措辞，
+    不编造方向。
+    """
+    topic = (topic or "").strip()
+    if (locale or "").lower().startswith("en"):
+        return [
+            f"Make a 12-week {topic} plan" if topic else "Make a 12-week study plan",
+            f"Find beginner {topic} resources" if topic else "Find beginner resources",
+            PLAN_CLARIFY_OPTIONS_EN_TAIL,
+        ]
+    return [
+        f"生成 12 周{topic}计划" if topic else "生成 12 周学习计划",
+        f"先找{topic}入门资料" if topic else "先找入门资料",
+        PLAN_CLARIFY_OPTIONS_ZH_TAIL,
+    ]
 
 
 # --------------------------------------------------------------- L0 规范化
@@ -142,8 +181,12 @@ class RouteDecision:
 def decide(text: str, *, locale: str = "zh-CN") -> RouteDecision:
     """只跑 L1。命中即返回；**没命中时返回 `source="fallback"`**，由调用方决定是否进 L2。
 
-    优先级（§7.4）：OUT_OF_SCOPE（原正则）| TASK_DELEGATION > 注入 > GREETING/CAPABILITY
-    > RESOURCE_SEARCH > L2。注入检测排在越界之后、问候之前：命中就不把这段输入送进模型（§13.5）。
+    优先级：OUT_OF_SCOPE（原正则）| TASK_DELEGATION > 注入 > GREETING/CAPABILITY
+    > RESOURCE_SEARCH > PLAN_CREATE（C2）> L2。注入检测排在越界之后、问候之前：
+    命中就不把这段输入送进模型（§13.5）。
+
+    PLAN_CREATE 放在 RESOURCE_SEARCH 之后：「帮我找学习计划的资料」仍按找资料执行，
+    不抢成"生成计划"。检索/问候/能力/计划判定与越界一样**零 LLM**。
     """
     body = normalize(text)
     if not body:
@@ -166,6 +209,18 @@ def decide(text: str, *, locale: str = "zh-CN") -> RouteDecision:
         return RouteDecision(intent=Intent.CAPABILITY, confidence=1.0, source="rule")
     if rules.is_search_intent(body):
         return RouteDecision(intent=Intent.RESOURCE_SEARCH, confidence=1.0, source="rule")
+    # C2：计划创建信号齐全 → 直接判 PLAN_CREATE，不再先丢给 L2。
+    if rules.is_plan_create(body):
+        return RouteDecision(intent=Intent.PLAN_CREATE, confidence=1.0, source="rule")
+    # C2：只说了「想学什么」（没有方向/周数/每周投入）→ PLAN_CREATE + 方向性提问。
+    if rules.is_study_goal(body):
+        return RouteDecision(
+            intent=Intent.PLAN_CREATE,
+            confidence=0.6,
+            source="rule",
+            needs_clarify=True,
+            clarify_options=plan_clarify_options(locale, rules.study_topic(body)),
+        )
 
     return RouteDecision(intent=Intent.CLARIFY, confidence=0.0, source="fallback")
 

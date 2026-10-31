@@ -20,8 +20,9 @@ import pytest
 
 from app.api import agent
 from app.db.connection import connect
-from app.services import llm_client, plan_service, plan_validate, planner, secrets, sse
+from app.services import llm_client, plan_service, plan_validate, planner, secrets
 from app.services import router as router_pkg
+from app.services import settings_service, sse
 from app.services.llm_client import LLMClient, LLMConfig
 from app.services.router.classify import classify
 
@@ -313,17 +314,14 @@ def test_task_delegation_rejected_without_llm(client, token, llm, message):
 
 @pytest.mark.parametrize("message, expected", [
     ("帮我找闭包的资料", "RESOURCE_SEARCH"),
-    ("帮我做个前端学习计划", "PLAN_CREATE"),
+    ("帮我做个 4 周、每周 1 小时的前端学习计划", "PLAN_CREATE"),
     ("帮我看看这个计划合不合理", "CLARIFY"),
 ])
 def test_task_delegation_does_not_reject_study_requests(client, token, llm, message,
                                                         expected):
     """3 条必须放行：一条都不许落成 OUT_OF_SCOPE。"""
     if expected == "PLAN_CREATE":
-        llm.responses.append(chat_response(classification_payload(slots={
-            "goal": "前端开发", "weeks": 4, "weekly_hours": 1,
-            "level": "beginner", "stack": "frontend",
-        })))
+        # C2 起「计划 + 学习」在 L1 直接判 PLAN_CREATE，不再消耗一次分类调用
         llm.responses.append(chat_response(json.dumps(draft_payload(), ensure_ascii=False)))
     elif expected == "CLARIFY":
         llm.responses.append(chat_response(classification_payload(
@@ -337,9 +335,104 @@ def test_task_delegation_does_not_reject_study_requests(client, token, llm, mess
     assert frames[0][1]["intent"] != "OUT_OF_SCOPE"
     if expected == "PLAN_CREATE":
         assert frames[-1][1]["kind"] == "plan_draft"
+        assert llm.calls == 1                          # 只有生成计划那一次
     elif expected == "RESOURCE_SEARCH":
         assert llm.calls == 0                          # 检索不需要模型
         assert frames[-1][1]["kind"] == "search"
+
+
+# --------------------------------------------------------------- P2：计划意图（C2）
+PLAN_CREATE_SAMPLES = [
+    "帮我做个前端学习计划",
+    "帮我安排一个 12 周的学习路线",
+    "帮我制定面试复习大纲",
+    "从零学 Python，给我排个大纲",
+    "我要转行做前端，帮我规划每周安排",
+]
+PLAN_NON_CREATE_SAMPLES = [
+    "帮我写个快排",
+    "有没有讲闭包的文章",
+    "学 Java 还是 Go",
+    "怎么学前端",
+    "帮我找前端入门资料",
+    "你好",
+]
+
+
+def test_plan_create_rule_positive_and_negative():
+    """C2：规划信号 + 学习信号 → PLAN_CREATE，零 LLM；两个既有边界原样保留。"""
+    for sample in PLAN_CREATE_SAMPLES:
+        assert router_pkg.rules.is_plan_create(sample) is True, sample
+        decision = router_pkg.decide(sample)
+        assert decision.intent.value == "PLAN_CREATE", sample
+        assert decision.source == "rule"
+        assert decision.needs_clarify is False
+        assert decision.confidence == 1.0
+
+    for sample in PLAN_NON_CREATE_SAMPLES:
+        assert router_pkg.rules.is_plan_create(sample) is False, sample
+        assert router_pkg.decide(sample).intent.value != "PLAN_CREATE", sample
+
+    # 既有边界一：越界话术仍由 L1 直接拒绝，不因为多了计划规则而放宽
+    assert router_pkg.rules.is_plan_create("帮我写个快排") is False
+    assert router_pkg.decide("帮我写个快排").intent.value == "OUT_OF_SCOPE"
+    # 既有边界二：「帮我做前端学习计划」里的"写/做"不构成越界问题
+    assert router_pkg.rules.is_plan_create("帮我做前端学习计划") is True
+    assert router_pkg.rules.is_task_delegation("帮我做前端学习计划") is False
+    assert router_pkg.decide("帮我做前端学习计划").intent.value == "PLAN_CREATE"
+
+
+def test_study_goal_asks_plan_direction():
+    """C2：只说「我想学前端」→ PLAN_CREATE + 方向性提问，零 LLM。"""
+    decision = router_pkg.decide("我想学前端")
+    assert decision.intent.value == "PLAN_CREATE"
+    assert decision.source == "rule"
+    assert decision.needs_clarify is True
+    assert decision.clarify_options == [
+        "生成 12 周前端计划",
+        "先找前端入门资料",
+        "给我学习路线建议",
+    ]
+    assert len(decision.clarify_options) == 3
+
+    assert "要不要我帮你排一个学习计划" in router_pkg.plan_clarify_text("zh-CN")
+    assert "study plan" in router_pkg.plan_clarify_text("en-US")
+    # 比较 / 征询类仍是 ADVICE 的输入，交给 L2，不抢成"排计划"
+    assert router_pkg.rules.is_study_goal("学 Java 还是 Go") is False
+    assert router_pkg.rules.is_study_goal("我想学 Java 还是 Go") is False
+    # 抽不到方向词就用通用措辞，不编造方向
+    assert router_pkg.plan_clarify_options("zh-CN")[0] == "生成 12 周学习计划"
+    assert router_pkg.plan_clarify_options("en-US", "frontend")[0] == \
+        "Make a 12-week frontend plan"
+
+
+def test_chat_study_goal_without_llm_asks_direction(client, token):
+    """未配模型也能追问方向：这是常量话术，不是模型生成（§7.7）。"""
+    resp = client.post("/api/agent/chat", headers=headers(token),
+                       json={"message": "我想学前端"})
+    assert resp.status_code == 200, resp.text
+    frames = parse_sse(resp.text)
+    assert [name for name, _ in frames] == ["intent", "delta", "done"]
+    assert frames[0][1]["intent"] == "PLAN_CREATE"
+    assert frames[0][1]["needs_clarify"] is True
+    assert frames[0][1]["clarify_options"] == [
+        "生成 12 周前端计划", "先找前端入门资料", "给我学习路线建议",
+    ]
+    assert "要不要我帮你排一个学习计划" in frames[1][1]["text"]
+    assert frames[-1][1]["kind"] == "clarify"
+
+
+def test_chat_l2_plan_clarify_does_not_generate(client, token, llm):
+    """L2 判成 PLAN_CREATE 但 needs_clarify 时也只能追问，不直接生成。"""
+    llm.responses.append(chat_response(classification_payload(
+        intent="PLAN_CREATE", confidence=0.8, needs_clarify=True,
+        slots={"goal": "前端"}, clarify_options=[])))
+    resp = client.post("/api/agent/chat", headers=headers(token),
+                       json={"message": "那个东西"})
+    frames = parse_sse(resp.text)
+    assert frames[-1][1]["kind"] == "clarify"
+    assert "要不要我帮你排一个学习计划" in frames[1][1]["text"]
+    assert llm.calls == 1
 
 
 def test_greeting_and_capability():
@@ -1169,26 +1262,20 @@ def test_chat_timeout_emits_error_event(client, token, llm):
 
 
 def test_chat_plan_create_returns_draft(client, token, llm):
-    llm.responses.append(chat_response(classification_payload(slots={
-        "goal": "前端开发", "weeks": 4, "weekly_hours": 1,
-        "level": "beginner", "stack": "frontend",
-    })))
     llm.responses.append(chat_response(json.dumps(draft_payload(), ensure_ascii=False)))
     resp = client.post("/api/agent/chat", headers=headers(token),
-                       json={"message": "帮我做个前端学习计划"})
+                       json={"message": "帮我做个 4 周、每周 1 小时的前端学习计划"})
     frames = parse_sse(resp.text)
     assert [name for name, _ in frames] == ["intent", "done"]
+    assert frames[0][1]["source"] == "rule"           # C2：L1 直接命中
     done = frames[-1][1]
     assert done["kind"] == "plan_draft"
     assert done["intent"] == "PLAN_CREATE"
     assert len(done["result"]["stages"]) == 2
+    assert llm.calls == 1
 
 
 def test_chat_plan_invalid_emits_error_with_suggestions(client, token, llm):
-    llm.responses.append(chat_response(classification_payload(slots={
-        "goal": "前端开发", "weeks": 12, "weekly_hours": 10,
-        "level": "beginner", "stack": "frontend",
-    })))
     bad = json.dumps({"title": "x", "goal": "y", "weeks": 12, "weekly_hours": 10,
                       "stages": [{"title": "只有一个阶段", "weeks": 12,
                                   "items": [{"title": "a", "est_minutes": 30}]}]},
@@ -1200,6 +1287,7 @@ def test_chat_plan_invalid_emits_error_with_suggestions(client, token, llm):
     assert frames[-1][0] == "error"
     assert frames[-1][1]["code"] == "PLAN_INVALID"
     assert frames[-1][1]["detail"]["suggestions"]
+    assert llm.calls == 2
 
 
 def test_chat_advice_streams_deltas(client, token, llm):
@@ -1214,6 +1302,56 @@ def test_chat_advice_streams_deltas(client, token, llm):
     assert names.count("delta") == 2
     assert frames[-1][1]["kind"] == "text"
     assert frames[-1][1]["usage"]["estimated"] is True
+
+
+# ------------------------------------------------- 默认输出预算（C3）
+def test_default_max_tokens_is_4096():
+    """默认 4096；契约的 256–8192 夹取范围不变（用户已保存的旧值也不迁移）。"""
+    assert llm_client.DEFAULT_MAX_TOKENS == 4096
+    # 单一事实来源：settings_service 不再自己写一份 1024（Lead 批准的跨模块例外）
+    assert settings_service.DEFAULT_MAX_TOKENS == llm_client.DEFAULT_MAX_TOKENS
+    assert llm_client.LLMConfig("http://x/v1", "sk-key", "m").max_tokens == 4096
+    assert llm_client._build_config("http://x/v1", "m", "sk-key", 0.3, None).max_tokens \
+        == 4096
+    assert llm_client._build_config("http://x/v1", "m", "sk-key", 0.3, 100).max_tokens \
+        == 256
+    assert llm_client._build_config("http://x/v1", "m", "sk-key", 0.3, 99999).max_tokens \
+        == 8192
+
+
+def test_settings_default_max_tokens_is_4096(client, token):
+    """从未保存过 `llm.max_tokens` 时，`GET /api/settings` 回 4096。"""
+    resp = client.get("/api/settings", headers=headers(token))
+    assert resp.status_code == 200
+    assert resp.json()["llm"]["max_tokens"] == 4096
+
+
+def test_settings_keeps_saved_max_tokens(client, token, db_path):
+    """用户已经保存过的旧值（1024）不做迁移，读出来仍是 1024。"""
+    conn = connect(db_path)
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO settings (key, value, updated_at) VALUES (?,?,?)",
+                ("llm.max_tokens", "1024", "2026-10-30T00:00:00+00:00"),
+            )
+    finally:
+        conn.close()
+    resp = client.get("/api/settings", headers=headers(token))
+    assert resp.status_code == 200
+    assert resp.json()["llm"]["max_tokens"] == 1024
+
+
+def test_advice_follows_configured_max_tokens(client, token, llm, monkeypatch):
+    """建议不再写死 1024：设置里存了什么就用什么（这里用 env 覆盖来证明）。"""
+    monkeypatch.setenv("PG_LLM_MAX_TOKENS", "2048")
+    llm.responses.append(chat_response(classification_payload(
+        intent="ADVICE", slots=None)))
+    llm.responses.append(stream_response(["先学基础。"]))
+    resp = client.post("/api/agent/chat", headers=headers(token),
+                       json={"message": "学 Java 还是 Go"})
+    assert resp.status_code == 200
+    assert llm.body(1)["max_tokens"] == 2048
 
 
 def test_chat_rate_limited(client, token, frozen_clock):
@@ -1342,8 +1480,10 @@ def test_chat_disconnect_closes_upstream():
     class FakeLLM:
         def __init__(self):
             self.closed = False
+            self.max_tokens: int | None = None
 
         async def stream(self, messages, *, max_tokens):
+            self.max_tokens = max_tokens
             try:
                 for chunk in ("第一块", "第二块"):
                     yield chunk
@@ -1358,7 +1498,6 @@ def test_chat_disconnect_closes_upstream():
             intent=router_pkg.Intent.ADVICE, confidence=0.8, source="llm")
         payload = agent.AgentChatRequest(message="给点建议")
         events = []
-        fake_llm = FakeLLM()
         async for event in agent._advice_events(
             FakeRequest(), None, decision, "给点建议", payload, fake_llm
         ):
@@ -1366,7 +1505,10 @@ def test_chat_disconnect_closes_upstream():
         await fake_llm.aclose()
         return events
 
+    fake_llm = FakeLLM()
     events = asyncio.run(go())
     assert closed["value"] is True
     assert events[-1].aborted is True
     assert events[-1].finish_reason == "aborted"
+    # 没有 config 的假 client：退回常量 4096，而不是旧的 1024（C3）
+    assert fake_llm.max_tokens == agent.ADVICE_MAX_TOKENS == 4096

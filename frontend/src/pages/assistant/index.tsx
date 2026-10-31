@@ -31,12 +31,12 @@ import {
   ClarifyOptions,
   ExampleCards,
   ModelGuide,
-  PlanDraftCard,
+  PlanSummary,
   SearchResults,
   SessionTokens,
   retryAfterSeconds,
 } from "@/features/assistant/components";
-import { isPlanDraftResult, isSearchResult, useAgentStream } from "@/features/assistant/hooks";
+import { isSearchResult, useAgentStream } from "@/features/assistant/hooks";
 import { sessionTokens, type AssistantMessage } from "@/features/assistant/types";
 import { useHealth } from "@/lib/query";
 
@@ -205,8 +205,8 @@ export default function AssistantPage() {
           <SearchResults data={message.result} />
         ) : null}
 
-        {message.kind === "plan_draft" && isPlanDraftResult(message.result) ? (
-          <PlanDraftCard draft={message.result} />
+        {message.kind === "plan_draft" && message.plan ? (
+          <PlanSummary plan={message.plan} onRetry={() => stream.retryPlanSave(message.id)} />
         ) : null}
 
         {message.kind === "clarify" ? (

@@ -86,6 +86,8 @@ const URL_PATTERN = /^https?:\/\/\S+$/i;
 const ABS_PATH_PATTERN = /^([A-Za-z]:[\\/]|\\\\|\/)/;
 const MAX_TOKENS_MIN = 256;
 const MAX_TOKENS_MAX = 8192;
+/** 从未保存过时的默认输出预算（C3；后端 `llm_client.DEFAULT_MAX_TOKENS` 与此一致）。 */
+const DEFAULT_MAX_TOKENS = 4096;
 
 interface LLMForm {
   base_url: string;
@@ -109,7 +111,7 @@ function llmFormOf(settings: SettingsRead | undefined): LLMForm {
     base_url: settings?.llm.base_url ?? "",
     model: settings?.llm.model ?? "",
     temperature: settings?.llm.temperature ?? 0.3,
-    max_tokens: String(settings?.llm.max_tokens ?? 1024),
+    max_tokens: String(settings?.llm.max_tokens ?? DEFAULT_MAX_TOKENS),
     api_key: "",
   };
 }
@@ -352,7 +354,7 @@ export default function SettingsPage() {
             base_url: llmForm.base_url.trim(),
             model: llmForm.model.trim(),
             temperature: llmForm.temperature,
-            max_tokens: Number(llmForm.max_tokens) || 1024,
+            max_tokens: Number(llmForm.max_tokens) || DEFAULT_MAX_TOKENS,
             ...(llmForm.api_key.trim() ? { api_key: llmForm.api_key.trim() } : {}),
           }
         : null;

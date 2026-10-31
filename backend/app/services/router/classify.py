@@ -27,7 +27,7 @@ from ..llm_client import (
     LLMFormatUnsupported,
     strip_fences,
 )
-from . import RouteDecision, clarify_options, normalize
+from . import RouteDecision, clarify_options, normalize, plan_clarify_options
 
 log = logging.getLogger("pgassistant.router.classify")
 
@@ -140,14 +140,17 @@ async def classify(text: str, llm: LLMClient, *, locale: str = "zh-CN") -> Route
 def _to_route(decision: _Decision, locale: str) -> RouteDecision:
     """把模型输出收敛成 `RouteDecision`；置信度不足统一走 CLARIFY（§7.2）。"""
     options = [item.strip() for item in decision.clarify_options if item.strip()][:3]
-    needs_clarify = (
-        decision.intent == Intent.CLARIFY
-        or decision.needs_clarify
-        or decision.confidence < MIN_CONFIDENCE
-    )
+    # 置信度不足 / 模型自己说 CLARIFY → CLARIFY；**只是信息不足**的计划意图保留
+    # PLAN_CREATE + needs_clarify，好让 API 层用方向性提问的固定话术追问（C2）。
+    lowered = decision.intent == Intent.CLARIFY or decision.confidence < MIN_CONFIDENCE
+    needs_clarify = lowered or decision.needs_clarify
+    if needs_clarify and not options and decision.intent == Intent.PLAN_CREATE:
+        # 计划意图的信息不足：选项要用"顺着学习方向"的三条，而不是通用那三条（C2）。
+        topic = (decision.slots.goal if decision.slots else "") or ""
+        options = plan_clarify_options(locale, topic)
     if needs_clarify:
         return RouteDecision(
-            intent=Intent.CLARIFY,
+            intent=decision.intent if not lowered else Intent.CLARIFY,
             confidence=min(1.0, max(0.0, decision.confidence)),
             source="llm",
             slots=decision.slots,

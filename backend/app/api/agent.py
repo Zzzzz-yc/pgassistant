@@ -55,6 +55,7 @@ from ..services.router import (
     decide,
     greeting_text,
     normalize,
+    plan_clarify_text,
     query_from_search_text,
     refusal,
 )
@@ -71,8 +72,9 @@ LIMITS: dict[str, tuple[int, float]] = {
     "extract": (10, 60.0),
 }
 
-#: 建议任务的输出预算（§7.10：建议 1024）。
-ADVICE_MAX_TOKENS = 1024
+#: 建议任务的输出预算兜底（C3：默认 4096）。实际以模型配置的 `max_tokens` 为准，
+#: 只有拿不到配置（例如测试里的假 client）时才用它。
+ADVICE_MAX_TOKENS = 4096
 
 #: 检索型回答取多少张卡片（§7.3「检索 + 卡片列表」）。
 SEARCH_LIMIT = 10
@@ -277,7 +279,12 @@ def _search_payload(conn, query: str) -> dict:
 
 # --------------------------------------------------------------- 计划入参
 def _plan_request(decision: RouteDecision, message: str) -> AgentPlanDraftRequest:
-    slots = decision.slots or PlanSlots()
+    slots = decision.slots
+    if slots is None and decision.source == "rule":
+        # L1 直接判成 PLAN_CREATE 时没有模型抽取的槽位：用 planner 的纯正则兜底，
+        # 「12 周」「每周 10 小时」「零基础」「前端」这些常见说法仍然生效（零 LLM）。
+        slots = planner.regex_slots(message)
+    slots = slots or PlanSlots()
     goal = (slots.goal or message or "").strip()[:120] or "学习计划"
     return AgentPlanDraftRequest(
         goal=goal,
@@ -373,8 +380,11 @@ async def agent_chat(request: Request, payload: AgentChatRequest, conn=Depends(g
 
     decision = decide(message, locale=payload.locale)
     config = load_llm_config(conn)
-    needs_llm = decision.source == "fallback" or decision.intent in (
-        Intent.PLAN_CREATE, Intent.PLAN_ADJUST, Intent.ADVICE
+    # L1 的计划意图但信息不足（「我想学前端」）用常量话术追问，零 LLM（C2）；
+    # fallback（需要 L2）与真正要生成/调整/建议的意图才要求模型可用。
+    needs_llm = decision.source == "fallback" or (
+        decision.intent in (Intent.PLAN_CREATE, Intent.PLAN_ADJUST, Intent.ADVICE)
+        and not decision.needs_clarify
     )
     if needs_llm and config is None:
         raise _http(
@@ -453,9 +463,14 @@ async def _chat_events(request: Request, payload: AgentChatRequest, message: str
             result = _search_payload(conn, query)
             yield _done(decision_local, kind="search", result=result)
         elif intent == Intent.PLAN_CREATE:
-            async for event in _plan_events(conn, _plan_request(decision_local, message),
-                                            decision_local, llm):
-                yield event
+            if decision_local.needs_clarify:
+                # 信息不足（只说「我想学前端」）：方向性提问，常量话术，零 LLM（C2）。
+                yield SseDeltaData(text=plan_clarify_text(payload.locale))
+                yield _done(decision_local, kind="clarify")
+            else:
+                async for event in _plan_events(conn, _plan_request(decision_local, message),
+                                                decision_local, llm):
+                    yield event
         elif intent == Intent.PLAN_ADJUST:
             async for event in _adjust_events(conn, payload, decision_local, message, llm):
                 yield event
@@ -554,7 +569,11 @@ async def _advice_events(request: Request, conn, decision: RouteDecision, messag
 
     chunks: list[str] = []
     aborted = False
-    agen = llm.stream(messages, max_tokens=ADVICE_MAX_TOKENS)
+    # C3：跟随设置里的 `llm.max_tokens`（默认 4096）；拿不到配置时退回常量。
+    configured = getattr(getattr(llm, "config", None), "max_tokens", None)
+    max_tokens = configured if isinstance(configured, int) and configured > 0 \
+        else ADVICE_MAX_TOKENS
+    agen = llm.stream(messages, max_tokens=max_tokens)
     try:
         async for chunk in agen:
             if not chunk:

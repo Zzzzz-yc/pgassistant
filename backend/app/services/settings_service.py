@@ -31,7 +31,7 @@ from ..schemas.models import (
     SettingsWrite,
 )
 from . import private_scanner, secrets
-from .llm_client import LLMClient, LLMConfig, LLMError
+from .llm_client import DEFAULT_MAX_TOKENS, LLMClient, LLMConfig, LLMError
 
 log = logging.getLogger("pgassistant.settings")
 
@@ -64,7 +64,7 @@ ENV_EMBEDDING = {
 }
 
 DEFAULT_TEMPERATURE = 0.3
-DEFAULT_MAX_TOKENS = 1024
+# `DEFAULT_MAX_TOKENS` 从 `llm_client` 引入（单一事实来源，C3）；这里不再重复定义。
 DEFAULT_LANGUAGE = "zh-CN"
 DEFAULT_CODE_RUNNER = True
 DEFAULT_ONBOARDED = False

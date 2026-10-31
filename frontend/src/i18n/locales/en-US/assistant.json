@@ -101,7 +101,13 @@
     "saved": "Saved",
     "preview": "Preview and edit",
     "note": "Saving writes to the database and makes it the active plan; use \"Preview and edit\" to change stages first.",
-    "retry": "Try saving again"
+    "retry": "Try saving again",
+    "summarySaved": "Drafted \"{{title}}\" ({{stages}} stages / {{items}} items / about {{hours}} h) and saved it to your plans",
+    "summarySaving": "Drafted \"{{title}}\" ({{stages}} stages / {{items}} items / about {{hours}} h) — saving it to your plans…",
+    "summaryFailed": "Drafted \"{{title}}\" ({{stages}} stages / {{items}} items / about {{hours}} h) — saving failed, the draft is still here",
+    "summaryWaiting": "Saving…",
+    "open": "Open in plans",
+    "retrySave": "Save failed — retry"
   },
   "level": {
     "beginner": "Beginner",
