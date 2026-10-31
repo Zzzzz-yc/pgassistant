@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app import main
+from app.services import llm_client, secrets
 
 HOST_127 = "http://127.0.0.1:8000"
 HOST_LOCALHOST = "http://localhost:8000"
@@ -111,7 +112,11 @@ def test_wrong_token_is_rejected(client):
     assert _code(resp) == "TOKEN_INVALID"
 
 
-def test_health_needs_no_token(client):
+def test_health_needs_no_token(client, monkeypatch):
+    # `/api/health` 会问「模型配没配」；不能让它读本机 keyring / data/llm_key。
+    monkeypatch.setattr(secrets, "load_secret", lambda name: None)
+    monkeypatch.setattr(llm_client, "_read_config_json", lambda: {})
+    monkeypatch.setattr(llm_client, "_read_secret_file", lambda: "")
     resp = client.get("/api/health")
     assert resp.status_code == 200
     body = resp.json()

@@ -20,7 +20,7 @@ import pytest
 
 from app.api import agent
 from app.db.connection import connect
-from app.services import llm_client, plan_service, plan_validate, planner, sse
+from app.services import llm_client, plan_service, plan_validate, planner, secrets, sse
 from app.services import router as router_pkg
 from app.services.llm_client import LLMClient, LLMConfig
 from app.services.router.classify import classify
@@ -51,6 +51,10 @@ def _isolate(monkeypatch, db_path):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(llm_client, "_read_config_json", lambda: {})
     monkeypatch.setattr(llm_client, "_read_secret_file", lambda: "")
+    # `load_llm_config` 先委托 `settings_service.llm_config`，后者用
+    # `secrets.load_secret`（keyring → data/llm_key）兜底，根本走不到上面
+    # 那个 `_read_secret_file`。隔离必须堵住真正被调用的入口。
+    monkeypatch.setattr(secrets, "load_secret", lambda name: None)
     monkeypatch.setattr(llm_client, "RATE_LIMIT_BACKOFF", (0.0, 0.0))
     monkeypatch.setattr(llm_client, "NETWORK_BACKOFF", 0.0)
     llm_client._SEMAPHORE = asyncio.Semaphore(2)
