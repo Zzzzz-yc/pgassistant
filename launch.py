@@ -11,7 +11,7 @@
 
     python launch.py                     启动（默认在 8000-8010 里挑第一个空闲端口）
     python launch.py start               同上
-    python launch.py stop                停止（先按 runtime.json 里的 pid，再按端口兜底）
+    python launch.py stop                停止（runtime.json 的 pid → health 探针 → 端口扫描）
 
 启动参数（旧 PowerShell 写法与 GNU 写法等价，大小写不敏感）::
 
@@ -24,9 +24,11 @@
 停止参数::
 
     --runtime-file <path>                读哪个运行状态文件
-    --port <n>                           状态文件缺失时用它做端口兜底
+    --port <n>                           只检查这个端口（可叠加；不给则扫 8000-8010）
     --dry-run                            只打印将要做的事，不杀进程、不删文件
 
+停止时的归属判定不依赖「读取别的进程命令行」：命令行读不到时，用
+GET /api/health 探针确认端口上是不是 pgassistant；认不出归属就不杀。
 退出码：成功 0；任何一步失败非 0，并打印原因。
 """
 
@@ -41,6 +43,7 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 import webbrowser
 from datetime import datetime, timezone
@@ -404,20 +407,6 @@ def find_listener_pids(port: int):
             pids.update(int(value) for value in re.findall(r"pid=(\d+)", line))
         return sorted(pids)
     return None
-
-
-def looks_like_our_server(cmdline: str | None) -> bool:
-    """端口兜底时的强校验：命令行里既有 uvicorn/app.main，又指向本仓库。
-
-    只认「命令行直接带仓库路径」的进程（我们的 venv python 一定带）。这样
-    别人的 :8000 服务、别的 checkout 的实例都不会被误杀。
-    """
-    if not cmdline:
-        return False
-    lowered = cmdline.lower()
-    if "uvicorn" not in lowered and "app.main" not in lowered:
-        return False
-    return str(ROOT).lower() in lowered or str(VENV).lower() in lowered
 
 
 # --------------------------------------------------------------------------
@@ -809,7 +798,109 @@ def as_int(value, minimum: int, maximum: int | None = None) -> int | None:
     return number
 
 
-def stop_pid(pid, tokens, label, killed, skipped) -> None:
+def probe_health(port: int, timeout: float = 2.0) -> tuple[bool, str]:
+    """HTTP 探针：确认端口上跑的是不是 pgassistant，不依赖读进程命令行。
+
+    ``/api/health`` 免令牌，所以不看 ``X-App-Token``；返回 (是否本项目, 说明)。
+    判据：HTTP 200 且 JSON 同时含 ``status == "ok"``、``db_ready``、``version``。
+    """
+    url = f"http://127.0.0.1:{port}/api/health"
+    try:
+        with _OPENER.open(url, timeout=timeout) as response:
+            code = response.status
+            raw = response.read()
+    except urllib.error.HTTPError as exc:  # 有 HTTP 响应，但不是 200
+        return False, f"health 返回 HTTP {exc.code}，不是 pgassistant"
+    except Exception as exc:  # 连接被拒 / 超时 / 根本不是 HTTP
+        return False, f"health 探针不通（{exc.__class__.__name__}）"
+    if code != 200:
+        return False, f"health 返回 HTTP {code}，不是 pgassistant"
+    try:
+        data = json.loads(raw.decode("utf-8", "replace"))
+    except ValueError:
+        return False, "health 响应不是 JSON，不是 pgassistant"
+    if not isinstance(data, dict):
+        return False, "health 响应不是 JSON 对象，不是 pgassistant"
+    missing = [key for key in ("status", "db_ready", "version") if key not in data]
+    if missing:
+        return False, f"health JSON 缺少 {'/'.join(missing)}，不是 pgassistant"
+    if data.get("status") != "ok":
+        return False, f"health 的 status 是 {data.get('status')!r}，不是 pgassistant"
+    return True, "health 探针确认是 pgassistant"
+
+
+def probe_is_pgassistant(port: int, timeout: float = 2.0) -> bool:
+    """端口上是否是 pgassistant：只信 HTTP health 探针，不读命令行。"""
+    return probe_health(port, timeout)[0]
+
+
+def wait_port_released(port: int, seconds: float) -> bool | None:
+    """等端口不再有 LISTENING；None 表示本平台没有可用的「端口 → pid」工具。"""
+    deadline = time.time() + seconds
+    while True:
+        pids = find_listener_pids(port)
+        if pids is None:
+            return None
+        if not pids:
+            return True
+        if time.time() >= deadline:
+            return False
+        time.sleep(0.2)
+
+
+def force_kill(pid: int) -> bool:
+    """强杀单个 pid（Windows taskkill /T /F；POSIX SIGKILL），失败返回 False。"""
+    if not pid_alive(pid):
+        return True
+    if IS_WINDOWS:
+        run(["taskkill", "/PID", str(pid), "/T", "/F"])
+        return not pid_alive(pid)
+    try:
+        os.killpg(pid, signal.SIGKILL)
+    except OSError:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            return False
+    time.sleep(0.2)
+    return not pid_alive(pid)
+
+
+def ensure_port_released(port: int) -> None:
+    """已确认归属的监听者被杀后复核端口：最多等 3s，未释放则强杀，仍失败抛错。"""
+    released = wait_port_released(port, 3.0)
+    if released is None:
+        raise LaunchError(f"停止后无法确认端口 {port} 是否释放（缺少 netstat / lsof / ss）。")
+    if released:
+        return
+    pids = find_listener_pids(port) or []
+    # 只有探针仍确认是本项目时才强杀：这几秒里可能有新进程抢到同一端口。
+    ours, detail = probe_health(port)
+    if not ours:
+        raise LaunchError(
+            f"停止后端口 {port} 仍被 pid {'/'.join(map(str, pids)) or '未知'} 监听，"
+            f"但 health 探针已无法确认是 pgassistant（{detail}）；为避免误杀未强杀，"
+            f"请手动检查：netstat -ano | findstr :{port}"
+        )
+    if not pids:
+        raise LaunchError(f"停止后端口 {port} 仍被监听，但查不到占用者 pid；请手动检查。")
+    warn(f"端口 {port} 3 秒内未释放（pid {'/'.join(map(str, pids))}），升级为强杀")
+    for pid in pids:
+        force_kill(pid)
+    released = wait_port_released(port, 2.0)
+    if released is not True:
+        remaining = find_listener_pids(port) or []
+        raise LaunchError(
+            f"强杀后端口 {port} 仍未释放（pid {'/'.join(map(str, remaining)) or '未知'}），停止失败。"
+        )
+    ok(f"端口 {port} 已释放（强杀）")
+
+
+def stop_pid(pid, tokens, label, killed, failures) -> None:
+    """按命令行判定并停止（Vite 这类进程没有 health 探针可用）。
+
+    读不到命令行时宁可跳过：只靠 pid 数字无法证明归属，杀了就是误杀。
+    """
     status, _cmdline = classify_pid(pid, tokens)
     if status == "gone":
         info(f"{label} pid {pid} 已不存在")
@@ -819,13 +910,37 @@ def stop_pid(pid, tokens, label, killed, skipped) -> None:
             ok(f"已停止 {label}（pid {pid}）")
             killed.append((label, pid))
         else:
-            raise LaunchError(f"停止 {label}（pid {pid}）失败：权限不足或被保护，可用管理员权限重试。")
+            failures.append(f"停止 {label}（pid {pid}）失败：权限不足或被保护，可用管理员权限重试。")
         return
     if status == "other":
         warn(f"pid {pid} 已被别的进程复用（命令行不是 {label}），跳过")
-        skipped.append(pid)
     else:
-        warn(f"读不到 pid {pid} 的命令行，改用端口判定（避免误杀）")
+        warn(f"读不到 pid {pid} 的命令行，{label} 不能靠 health 探针判定，跳过（避免误杀）")
+
+
+def runtime_pid_verdict(pid: int, port: int | None) -> tuple[str, str]:
+    """判定 runtime 文件里的 pid 是否属于本项目，返回 (verdict, 说明)。
+
+    verdict：
+      gone       pid 已不存在；
+      project    命令行可读且匹配（沿用原 token 校验）；
+      probe      命令行读不到，但记录的端口通过 health 探针（不依赖系统权限）；
+      reused     命令行可读但不像本项目（pid 被复用，绝不能杀）；
+      unverified 读不到命令行且探针不确认，交给端口扫描。
+    """
+    status, _cmdline = classify_pid(pid, ("uvicorn", "app.main"))
+    if status == "gone":
+        return "gone", "已不存在"
+    if status == "project":
+        return "project", "命令行确认"
+    if status == "other":
+        return "reused", "命令行不是本项目（pid 可能已被复用）"
+    if port is None:
+        return "unverified", "读不到命令行，runtime 也没记录端口"
+    ours, detail = probe_health(port)
+    if ours:
+        return "probe", f"端口 {port} 的 health 探针确认"
+    return "unverified", f"读不到命令行，端口 {port} 的 health 探针不确认（{detail}）"
 
 
 def cmd_stop(opts: Options) -> int:
@@ -839,14 +954,6 @@ def cmd_stop(opts: Options) -> int:
     vite_pid = as_int(state.get("vite_pid"), 1) if state else None
     known_port = as_int(state.get("port"), 1, 65535) if state else None
 
-    ports = []
-    if known_port:
-        ports.append(known_port)
-    if opts.port is not None and opts.port not in ports:
-        ports.append(opts.port)
-    if not ports:
-        ports = list(range(PORT_START, PORT_END + 1))
-
     step("停止 pgassistant" + ("（dry-run）" if dry else ""))
     if state is None:
         info(f"没有 runtime 文件（{rel(runtime)}），按端口兜底查找监听者")
@@ -854,64 +961,109 @@ def cmd_stop(opts: Options) -> int:
         info(f"按 --port {opts.port} 兜底")
 
     killed = []
-    skipped = []
+    failures = []
     planned = 0
     vite_killed = False
     summary_port = known_port or opts.port
+    runtime_hit = False
 
     # 先停 Vite 再停后端：后端一退出，前台 launch.py 的 finally 会立刻清 Vite，
     # 两边同时 taskkill 同一棵树会让 stop 读不到命令行、把「Vite 已停」误报成「否」。
-    if not dry:
-        if vite_pid:
-            before = len(killed)
-            stop_pid(vite_pid, ("vite", "npm", "node"), "Vite", killed, skipped)
-            vite_killed = len(killed) > before
-        if server_pid:
-            stop_pid(server_pid, ("uvicorn", "app.main"), "uvicorn", killed, skipped)
-    else:
-        for pid, tokens, label in (
-            (vite_pid, ("vite", "npm", "node"), "Vite"),
-            (server_pid, ("uvicorn", "app.main"), "uvicorn"),
-        ):
-            if not pid:
-                continue
-            status, _cmdline = classify_pid(pid, tokens)
+    if vite_pid:
+        if dry:
+            status, _cmdline = classify_pid(vite_pid, ("vite", "npm", "node"))
             if status == "project":
                 planned += 1
-                info(f"将停止 {label}（pid {pid}，含子进程树）")
+                info(f"将停止 Vite（pid {vite_pid}，含子进程树）")
             elif status == "gone":
-                info(f"{label} pid {pid} 已不存在")
+                info(f"Vite pid {vite_pid} 已不存在")
             else:
-                warn(f"pid {pid} 不确认是本项目的 {label}（{status}），将改用端口判定")
+                warn(f"pid {vite_pid} 不确认是本项目的 Vite（{status}），跳过（避免误杀）")
+        else:
+            before = len(killed)
+            stop_pid(vite_pid, ("vite", "npm", "node"), "Vite", killed, failures)
+            vite_killed = len(killed) > before
 
-    # 端口兜底：runtime 缺失 / pid 无效 / pid 杀完端口仍在监听时都走这里。
-    # 只认命令行里带本仓库路径的 uvicorn，别人的 :8000 服务绝不碰。
-    for port in ports:
+    # runtime 里的后端 pid：命令行可读就用命令行；读不到就靠该端口的 health 探针。
+    # 探针也不认（或 pid 已被复用）就落到下面的端口扫描，绝不凭 pid 数字直接杀。
+    if server_pid:
+        verdict, detail = runtime_pid_verdict(server_pid, known_port)
+        if verdict == "gone":
+            info(f"uvicorn pid {server_pid} 已不存在，改用端口判定")
+        elif verdict in ("project", "probe"):
+            if dry:
+                planned += 1
+                info(f"将停止 uvicorn（pid {server_pid}，{detail}）")
+                runtime_hit = True
+            elif kill_tree(server_pid):
+                ok(f"已停止 uvicorn（pid {server_pid}，{detail}）")
+                killed.append(("uvicorn", server_pid))
+                runtime_hit = True
+                if known_port is not None:
+                    try:
+                        ensure_port_released(known_port)
+                        ok(f"端口 {known_port} 已释放")
+                    except LaunchError as exc:
+                        failures.append(str(exc))
+            else:
+                warn(f"停止 uvicorn（pid {server_pid}）失败：权限不足或被保护，改用端口判定")
+        elif verdict == "reused":
+            warn(f"pid {server_pid} 已被别的进程复用（{detail}），跳过")
+        else:
+            warn(f"无法确认 pid {server_pid} 的归属（{detail}），跳过")
+
+    # 端口兜底：端口 → pid 只来自 netstat -ano，归属只信 health 探针。
+    # 覆盖 runtime 缺失、runtime 里的 pid 判定失败、或用户显式给了 --port 的情况。
+    scan_ports: list[int] = []
+    if opts.port is not None:
+        scan_ports.append(opts.port)
+    if state is None:
+        if opts.port is None:
+            scan_ports = list(range(PORT_START, PORT_END + 1))
+    elif not runtime_hit:
+        fallback = list(range(PORT_START, PORT_END + 1))
+        if known_port is not None:
+            fallback = [known_port] + [port for port in fallback if port != known_port]
+        for port in fallback:
+            if port not in scan_ports:
+                scan_ports.append(port)
+
+    for port in scan_ports:
         listener_pids = find_listener_pids(port)
         if listener_pids is None:
-            warn("没找到 lsof 或 ss，跳过端口兜底；请手动确认端口已释放。")
+            warn("没找到 netstat / lsof / ss，无法把端口映射到进程；请手动确认端口已释放。")
             break
+        if not listener_pids:
+            if not dry:
+                info(f"端口 {port} 没有监听，跳过")
+            continue
+        pid_text = "/".join(map(str, listener_pids))
+        ours, detail = probe_health(port)
+        if not ours:
+            warn(f"端口 {port} 被 pid {pid_text} 占用，跳过：{detail}（认不出归属，不杀）")
+            continue
+        if dry:
+            planned += 1
+            info(f"端口 {port}：将停止 pid {pid_text}（{detail}）")
+            continue
         for pid in listener_pids:
-            if pid in skipped or pid <= 0:
+            if pid <= 0:
                 continue
             if any(pid == killed_pid for _label, killed_pid in killed):
                 continue
-            cmdline = process_command_line(pid)
-            if looks_like_our_server(cmdline):
-                if dry:
-                    planned += 1
-                    info(f"端口 {port} 的监听进程是本项目的 uvicorn（pid {pid}），将停止")
-                elif kill_tree(pid):
-                    ok(f"已停止端口 {port} 上的残留 uvicorn（pid {pid}）")
-                    killed.append((f"端口 {port} 的 uvicorn", pid))
-                    if summary_port is None:
-                        summary_port = port
-                else:
-                    raise LaunchError(f"停止端口 {port} 的 pid {pid} 失败：权限不足或被保护。")
-            elif cmdline:
-                warn(f"端口 {port} 被 pid {pid} 占用（不是本项目启动的），已跳过")
+            if kill_tree(pid):
+                ok(f"端口 {port}：已停止 pid {pid}（{detail}）")
+                killed.append((f"端口 {port} 的 pgassistant", pid))
+                if summary_port is None:
+                    summary_port = port
             else:
-                warn(f"端口 {port} 被 pid {pid} 占用，但读不到它的命令行，已跳过（避免误杀）")
+                warn(f"端口 {port}：停止 pid {pid} 失败（权限不足或被保护），等待复核/强杀")
+        try:
+            ensure_port_released(port)
+            if any(label.startswith(f"端口 {port}") for label, _pid in killed):
+                ok(f"端口 {port} 已释放")
+        except LaunchError as exc:
+            failures.append(str(exc))
 
     if dry:
         if planned:
@@ -922,13 +1074,13 @@ def cmd_stop(opts: Options) -> int:
         print("\ndry-run 完成：以上为将要执行的步骤，未产生任何改动。", flush=True)
         return 0
 
-    errors = []
     if killed:
-        if runtime.exists():
+        # 有失败就保留 runtime 文件，下一次 stop 还能从它重试。
+        if runtime.exists() and not failures:
             try:
                 runtime.unlink()
             except OSError as exc:
-                errors.append(f"删除 {rel(runtime)} 失败：{exc}")
+                failures.append(f"删除 {rel(runtime)} 失败：{exc}")
             else:
                 ok(f"已清理 {rel(runtime)}")
         print(
@@ -936,21 +1088,24 @@ def cmd_stop(opts: Options) -> int:
             f"Vite: {'是' if vite_killed else '否'} / 进程数 {len(killed)}",
             flush=True,
         )
-        if errors:
-            for message in errors:
-                warn(message)
-            return 1
-        return 0
+    elif failures:
+        print("\n  停止未完成（原因见下），保留 runtime 文件以便重试", flush=True)
+    else:
+        print("\n  当前没有在运行的实例", flush=True)
+        if runtime.exists():
+            # 端口上没有可确认的本项目进程时，仍清掉过期的 runtime 文件，
+            # 否则下次启动会继续拿一个死 pid 当线索。
+            try:
+                runtime.unlink()
+                ok(f"已清理过期的 {rel(runtime)}")
+            except OSError as exc:
+                warn(f"删除 {rel(runtime)} 失败：{exc}")
 
-    print("\n  当前没有在运行的实例", flush=True)
-    if runtime.exists():
-        # 端口上没有可确认的本项目进程时，仍清掉过期的 runtime 文件，
-        # 否则下次启动会继续拿一个死 pid 当线索。
-        try:
-            runtime.unlink()
-            ok(f"已清理过期的 {rel(runtime)}")
-        except OSError as exc:
-            warn(f"删除 {rel(runtime)} 失败：{exc}")
+    if failures:
+        for message in failures:
+            warn(message)
+        warn(f"停止未完成（{len(failures)} 个问题），退出码非 0。")
+        return 1
     return 0
 
 
