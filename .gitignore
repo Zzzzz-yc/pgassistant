@@ -1,3 +1,8 @@
+# 抓取/转换生成的内容不入库；手写的元数据（分类名、计划模板、分词词典）必须入库
+content/*
+!content/_meta/
+!content/_meta/**
+
 # 运行时数据
 data/
 !data/.gitkeep

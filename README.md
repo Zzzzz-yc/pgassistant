@@ -63,21 +63,26 @@ M0–M6 全部落地。
 
 手动等价命令：
 
+首次运行会自动准备内容库（需要联网，约几分钟）；内容库不入库。
+
 ```bash
 # 1. 建环境并装依赖
 python -m venv .venv
 .venv\Scripts\activate        # Windows；macOS / Linux 用 source .venv/bin/activate
 python -m pip install -r backend/requirements.txt
 
-# 2. 建库并索引（首次约 2 秒；索引会读 content/_meta 下的 taxonomy、jieba 词典与计划模板）
+# 2. 准备内容库（仅首次；已有内容会自动跳过）
+python tools/prepare_content.py
+
+# 3. 建库并索引（首次约 2 秒；索引会读 content/_meta 下的 taxonomy、jieba 词典与计划模板）
 python backend/scripts/bootstrap_index.py
 
-# 3. 构建前端（首次；之后改了前端代码才需重跑）
+# 4. 构建前端（首次；之后改了前端代码才需重跑）
 # npm ci 按 package-lock.json 精确安装；没有 lock 时才退回 npm install
 npm ci --prefix frontend
 npm run build --prefix frontend
 
-# 4. 起服务
+# 5. 起服务
 python -m uvicorn app.main:app --app-dir backend --port 8000
 ```
 
@@ -142,9 +147,9 @@ npm run build --prefix frontend                # 前端类型检查 + 构建（b
 .
 ├─ 需求文档.md            # 唯一规格来源
 ├─ README.md / HANDOFF.md / MIGRATION.md / CONTRIBUTING.md
-├─ content/               # 资料库（只读，随仓库分发）
-│  ├─ _meta/              # taxonomy.yml、jieba_dict.txt、templates/*.yml
-│  ├─ CREDITS.md          # 内容来源与许可
+├─ content/               # 资料库（本地生成，不入库；首次运行自动准备）
+│  ├─ _meta/              # 手写元数据：taxonomy.yml、jieba_dict.txt、templates/*.yml
+│  ├─ CREDITS.md          # 生成的内容来源登记（不入库）
 │  ├─ assets/             # 全局图片
 │  └─ {stack}/{category}/*.md
 ├─ backend/
@@ -219,7 +224,8 @@ M5 新增 `INDEX_BUILDING` / `RATE_LIMITED` / `PATH_FORBIDDEN` / `PRIVATE_DIR_IN
 
 ## 内容维护
 
-不要在 `content/` 里手写内容，改脚本重跑，保证可复现。详见 [tools/README.md](tools/README.md)。
+`content/` 的正文由 `tools/prepare_content.py` 生成，不要手改；首次运行会自动准备，重建用 `--force`。
+详见 [tools/README.md](tools/README.md)。
 
 ```
 改 sources.json → fetch_intro.py → validate_content.py → bootstrap_index.py → content_gaps.py
@@ -256,4 +262,4 @@ M3 计划（已完成）→ M4 助手（已完成）→ M5 打磨（已完成）
 
 ## 许可
 
-代码 MIT（见 LICENSE）。学习资料来自 MIT / CC-BY-SA 等开源项目，逐条署名见 [content/CREDITS.md](content/CREDITS.md)。
+代码 MIT（见 LICENSE）。内容来源登记见 [docs/CREDITS.md](docs/CREDITS.md)；内容库本身不入库。
