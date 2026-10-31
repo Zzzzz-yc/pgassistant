@@ -2,7 +2,7 @@
   "version": 1,
   "rules": {
     "only_summary": false,
-    "max_body_chars": 20000,
+    "max_body_chars": 40000,
     "fetch_interval_sec": 1.0
   },
   "batches": {

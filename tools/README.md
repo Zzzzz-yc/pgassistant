@@ -14,13 +14,13 @@
 ## 抓取规则（sources.json 的 `rules`）
 
 ```json
-"rules": {"only_summary": false, "max_body_chars": 20000, "fetch_interval_sec": 1.0}
+"rules": {"only_summary": false, "max_body_chars": 40000, "fetch_interval_sec": 1.0}
 ```
 
 | 键 | 含义 |
 |---|---|
 | `only_summary` | 已废弃的旧开关。固定为 `false`：提取完整正文，不再只取「摘要 + 前 5 段要点 + 速查表」。置为 `true` 时脚本只打印提示，仍按完整正文处理 |
-| `max_body_chars` | 单篇正文上限（去空白字符数）。超过时按段落边界截断，并在文末标注「节选」 |
+| `max_body_chars` | 单篇正文上限（去空白字符数）。超过时按段落边界截断，并在文末标注「节选，原文见 source_url」 |
 | `fetch_interval_sec` | 同一域名的请求间隔，**不得小于 1.0 秒**（脚本内强制取 `max(1.0, 配置值)`） |
 
 `fetch_intro.py` 的抓取约束：
@@ -30,7 +30,7 @@
 - 纯标准库：`urllib` + `html.parser`，不引第三方 HTML 解析库。
 - 正文提取保留 h2/h3 标题层级、代码块（含语言标记）、表格、列表；剔除导航、页脚、侧栏、广告、评论区、「本页译自」类样板。
 - 已适配页面结构：`runoob.com`（`#content` / `.article-intro`）、`developer.mozilla.org`（`main#content`）、`zh-hans.react.dev`（`article`）、`typescriptlang.org`（`article .markdown`）；其它站点走 `<main>`/`<article>` 兜底。
-- 输出：front-matter 必填字段与 `license` 不变，`body_md` 统一 LF、UTF-8 无 BOM；正文末尾保留 `source_url` 与许可的引用说明。
+- 输出：只重写 `body_md`；front-matter 除按正文重算的 `duration_min`（算式同 `indexer.estimate_minutes`：中文字数/400，夹取 5–120）外逐字保留（`summary`/`license`/`source_url` 等一律不动）。`body_md` 统一 LF、UTF-8 无 BOM；正文末尾保留 `source_url` 与许可的引用说明。
 
 ## 典型流程
 
@@ -47,6 +47,7 @@ python tools/fetch_intro.py --out ./content --batch p2
 python tools/fetch_intro.py --out ./content --batch all --only js-closures,sql-intro
 python tools/fetch_intro.py --list
 python tools/fetch_intro.py --out ./content --batch all --only ... --report report.json
+python tools/fetch_intro.py --self-test   # 嵌套列表 / 代码块 UI 剔除的最小用例
 ```
 
 ## 依赖

@@ -260,23 +260,29 @@ def _class_has(node, token):
     return token in node.classes().lower()
 
 
+def _generic_root(doc):
+    return (find_first(doc, lambda n: n.tag == "main")
+            or find_first(doc, lambda n: n.tag == "article")
+            or find_first(doc, lambda n: _by_id(n, "content")))
+
+
 def pick_root(doc, url):
-    """按站点结构挑正文容器；返回 (root, site)。"""
+    """按站点结构挑正文容器；站点结构变化时回落到通用容器。返回 (root, site)。"""
     host = urllib.parse.urlparse(url).netloc.lower()
 
     if "runoob.com" in host:
         node = find_first(doc, lambda n: _by_id(n, "content")) \
             or find_first(doc, lambda n: "article-intro" in n.classes()) \
             or find_first(doc, lambda n: "article-body" in n.classes())
-        return node, "runoob"
+        return (node or _generic_root(doc)), "runoob"
 
     if "developer.mozilla.org" in host:
         node = find_first(doc, lambda n: n.tag == "main" and _by_id(n, "content"))
-        return node, "mdn"
+        return (node or _generic_root(doc)), "mdn"
 
     if "react.dev" in host:
         node = find_first(doc, lambda n: n.tag == "article")
-        return node, "react"
+        return (node or _generic_root(doc)), "react"
 
     if "typescriptlang.org" in host:
         main = find_first(doc, lambda n: n.tag == "main")
@@ -284,13 +290,9 @@ def pick_root(doc, url):
         if article is None:
             article = find_first(doc, lambda n: n.tag == "article")
         md = find_first(article, lambda n: "markdown" in n.classes()) if article is not None else None
-        return (md or article), "typescript"
+        return (md or article or _generic_root(doc)), "typescript"
 
-    # 通用兜底
-    node = find_first(doc, lambda n: n.tag == "main") \
-        or find_first(doc, lambda n: n.tag == "article") \
-        or find_first(doc, lambda n: _by_id(n, "content"))
-    return node, "generic"
+    return _generic_root(doc), "generic"
 
 
 def meta_descriptions(doc):
@@ -460,7 +462,12 @@ def pre_text(pre):
         if isinstance(n, str):
             buf.append(n)
             return
-        if n.tag in ("script", "style", "template", "svg"):
+        if n.tag in ("script", "style", "template", "svg", "button"):
+            return
+        cls = n.attrs.get("class", "").lower().split()
+        if "error" in cls or "error-behind" in cls or "playground-link" in cls:
+            return
+        if n.tag == "a" and text_of(n).strip() == "Try":
             return
         if "language-id" in n.classes():
             return
@@ -571,9 +578,9 @@ def render_list(node, ctx, depth=0):
             lines.append(prefix + marker + text)
         for sub in li.children:
             if isinstance(sub, Node) and sub.tag in ("ul", "ol"):
-                sub_lines = render_list(sub, ctx, depth + 1)
-                if sub_lines:
-                    lines.extend(sub_lines)
+                sub_text = render_list(sub, ctx, depth + 1)
+                if sub_text:
+                    lines.append(sub_text)
         pre = next((c for c in li.children if isinstance(c, Node) and c.tag == "pre"), None)
         if pre is not None:
             body = fence(pre_text(pre), detect_lang(pre))
@@ -840,34 +847,79 @@ def truncate_body(body, limit):
     return "\n\n".join(kept).rstrip() + tail, True
 
 
+def split_frontmatter_text(text):
+    """拆出 (front-matter 行列表, 正文)；没有 front-matter 时返回 (None, text)。"""
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != "---":
+        return None, text
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return lines[1:i], "\n".join(lines[i + 1:])
+    return None, text
+
+
+def estimate_minutes(body_md):
+    """与 backend/app/services/indexer.py:estimate_minutes 相同的算式。"""
+    cjk = sum(1 for ch in body_md if "\u4e00" <= ch <= "\u9fff")
+    return max(5, min(120, round(cjk / 400)))
+
+
+def read_duration(path):
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    fm, _ = split_frontmatter_text(text)
+    for line in fm or []:
+        m = re.match(r"^duration_min:\s*(\d+)\s*$", line)
+        if m:
+            return int(m.group(1))
+    return None
+
+
 def write_entry(root, item, body, summary):
-    text_len = len(re.sub(r"\s", "", body))
-    minutes = max(5, min(45, round(text_len / 450) or 5))
-    fm = "\n".join([
-        "---",
-        "slug: " + item["stack"] + "/" + item["category"] + "/" + item["slug"],
-        'title: "' + item["title"].replace('"', "'") + '"',
-        'summary: "' + summary.replace('"', "'") + '"',
-        "author: " + item["author"],
-        "license: " + item["license"],
-        "source_url: " + item["url"],
-        "stack: " + item["stack"],
-        "category: " + item["category"],
-        "level: beginner",
-        "type: docs",
-        "duration_min: " + str(minutes),
-        "tags: [" + ", ".join(item["tags"]) + "]",
-        "lang: zh",
-        "---",
-        "",
-    ])
+    """重写 body_md；front-matter 除 duration_min 外逐字保留。"""
     note = ("\n\n> 本文正文摘录自 [原文](" + item["url"] + ")，版权归 " + item["author"]
             + " 所有（" + item["license"] + "）；完整内容与更新请访问原文。")
-    content = fm + "\n" + body + note + "\n"
+    body_md = body + note
+    text_len = len(re.sub(r"\s", "", body))
+    minutes = estimate_minutes(body_md)
+
     d = root / item["stack"] / item["category"]
     d.mkdir(parents=True, exist_ok=True)
-    (d / (item["slug"] + ".md")).write_text(content, encoding="utf-8", newline="\n")
-    return text_len
+    path = d / (item["slug"] + ".md")
+
+    fm_lines = None
+    if path.exists():
+        fm_lines, _ = split_frontmatter_text(path.read_text(encoding="utf-8"))
+
+    if fm_lines is None:
+        # 新文件才按 sources.json 生成 front-matter
+        fm_lines = [
+            "slug: " + item["stack"] + "/" + item["category"] + "/" + item["slug"],
+            'title: "' + item["title"].replace('"', "'") + '"',
+            'summary: "' + summary.replace('"', "'") + '"',
+            "author: " + item["author"],
+            "license: " + item["license"],
+            "source_url: " + item["url"],
+            "stack: " + item["stack"],
+            "category: " + item["category"],
+            "level: beginner",
+            "type: docs",
+            "duration_min: " + str(minutes),
+            "tags: [" + ", ".join(item["tags"]) + "]",
+            "lang: zh",
+        ]
+    else:
+        fm_lines = [
+            ("duration_min: " + str(minutes)) if re.match(r"^duration_min\s*:", ln) else ln
+            for ln in fm_lines
+        ]
+
+    content = "---\n" + "\n".join(fm_lines) + "\n---\n\n" + body_md + "\n"
+    path.write_text(content, encoding="utf-8", newline="\n")
+    return {"chars": text_len, "minutes": minutes,
+            "cjk": sum(1 for ch in body_md if "\u4e00" <= ch <= "\u9fff")}
 
 
 def body_chars_of(path):
@@ -889,6 +941,34 @@ def load_registry(path=REGISTRY):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def run_self_test():
+    """最小用例：嵌套列表必须渲染成缩进完整行，而不是逐字符展开。"""
+    html = ('<html><body><div id="content"><ul>'
+            '<li>父项<ul><li>子项甲</li><li>子项乙</li></ul></li>'
+            '<li>次项</li></ul>'
+            '<ol><li>一<ul><li>a</li></ul></li></ol>'
+            '</div></body></html>')
+    body, _site, _descs, err = extract_body(html, "https://example.com/nested")
+    expected = "- 父项\n  - 子项甲\n  - 子项乙\n- 次项\n\n1. 一\n  - a"
+    assert err == "" and body, "self-test: 提取失败"
+    assert body == expected, "self-test: 嵌套列表输出不符\n%r" % body
+    for line in body.split("\n"):
+        stripped = line.strip()
+        assert not (len(stripped) == 1 and stripped != "-"), "self-test: 出现单字符行 %r" % line
+    print("self-test OK: 嵌套列表")
+
+    # 代码块内不得混入站点 UI（playground-link / 错误浮层）
+    ui_html = ('<html><body><div id="content"><pre class="shiki">'
+               '<div class="language-id">ts</div><div class="code-container"><code>'
+               "<div class='line'>const n = 1;</div>"
+               '<span class="error"><span>err text</span><span class="code">2551</span></span>'
+               '<span class="error-behind">err text</span>'
+               "</code><a class='playground-link'>Try</a></div></pre></div></body></html>")
+    ui_body, _s, _d, _e = extract_body(ui_html, "https://www.typescriptlang.org/x")
+    assert ui_body == "```ts\nconst n = 1;\n```", "self-test: 代码块 UI 未剔除 %r" % ui_body
+    print("self-test OK: 代码块 UI 剔除")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="./content")
@@ -896,7 +976,12 @@ def main():
     ap.add_argument("--only", default="")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--report", default="")
+    ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()
+
+    if args.self_test:
+        run_self_test()
+        return
 
     reg = load_registry()
     batches = reg["batches"]
@@ -921,7 +1006,7 @@ def main():
 
     if rules.get("only_summary"):
         print("提示: only_summary 已废弃，本脚本始终按完整正文模式抓取")
-    max_body = int(rules.get("max_body_chars", 20000) or 0)
+    max_body = int(rules.get("max_body_chars", 40000) or 0)
     fetcher = Fetcher(rules.get("fetch_interval_sec", MIN_INTERVAL))
     root = Path(args.out)
     report, ok = [], 0
@@ -949,10 +1034,15 @@ def main():
 
         body, truncated = truncate_body(body, max_body)
         summary = build_summary(descs, body, item["title"])
-        new = write_entry(root, item, body, summary)
-        row.update(new=new, result="成功", site=site,
+        old_duration = read_duration(path)
+        info = write_entry(root, item, body, summary)
+        row.update(new=info["chars"], result="成功", site=site,
+                   old_duration=old_duration, new_duration=info["minutes"],
+                   cjk=info["cjk"],
+                   formula="max(5,min(120,round(%d/400)))=%d" % (info["cjk"], info["minutes"]),
                    reason=("正文超过 %d 字，已按规则截断" % max_body) if truncated else "")
-        print("OK", item["slug"], old, "->", new, "字", "（截断）" if truncated else "")
+        print("OK", item["slug"], old, "->", info["chars"], "字", "时长",
+              old_duration, "->", info["minutes"], "（截断）" if truncated else "")
         report.append(row)
         ok += 1
 
