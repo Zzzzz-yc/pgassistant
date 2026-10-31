@@ -131,7 +131,7 @@ export interface StackNode {
   stack: string;
   total: number;
   categories: CategoryNode[];
-  /** M1 恒为 null/缺席；M0 建 `content/_meta/taxonomy.yml` 后补。 */
+  /** 来自 `content/_meta/taxonomy.yml` 的展示名（M2 已实现）；文件缺失/解析失败时降级 `null`。 */
   label?: LocalizedLabel | null;
 }
 
@@ -361,8 +361,8 @@ export interface ItemRead {
   /**
    * 按 `resource_slug` 实时解析的资料类型（§8.5 条目行类型图标 /「只看视频」筛选，D25）。
    * null = 未绑定资料或资料已下架。
-   * 现状：键已随 Pydantic 模型输出，但解析未落地，**值恒为 null**（计划模块待办）；
-   * 所以先写可选，且**不得**把 null 当"无类型"的权威判断。落地后由契约层收紧为必填。
+   * 解析已落地（`plan_service._build_plan` 整树一次 `resolve_resources`）；仍写可选是为兼容
+   * 乐观缓存的临时条目（不带键），**不得**把 null 当"无类型"的权威判断。
    */
   resource_type?: ResourceType | null;
   /** 按 `resource_slug` 实时解析的难度（§8.5 难度徽章，D25）；null 语义同 `resource_type`。 */
