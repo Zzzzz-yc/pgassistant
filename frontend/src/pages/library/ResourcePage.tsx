@@ -27,6 +27,7 @@ import type { ResourceDetail, ResourceSummary, TocNode } from "@/types/api";
 
 import { AddToPlanDialog } from "@/features/library/AddToPlanDialog";
 import { getScrollContainer, useRelated, useResource, useTaxonomyData } from "@/features/library/hooks";
+import { localizedLabel } from "@/features/library/labels";
 import { libraryHref, mediaUrl, resourceHref } from "@/features/library/media";
 import { CodeRunnerPanel } from "@/features/runner/components/CodeRunnerPanel";
 import { RunButton } from "@/features/runner/components/RunButton";
@@ -39,7 +40,7 @@ import "./library.css";
 const RELATED_SHOWN = 3;
 
 export default function ResourcePage() {
-  const { t } = useTranslation("library");
+  const { t, i18n } = useTranslation("library");
   const navigate = useNavigate();
   const params = useParams();
   // 路由是 `library/:slug(*)`（MODULES §3.1）。React Router 6 的 splat 参数既可能叫
@@ -101,10 +102,16 @@ export default function ResourcePage() {
   const resource = detail.data;
   const toc = resource.toc ?? [];
   const relatedItems = (related.data?.items ?? []).slice(0, RELATED_SHOWN);
-  // 面包屑用 taxonomy 里的中文名（`content/_meta/taxonomy.yml` → `stacks[].label`），
-  // 拿不到就退回原始 stack 值，不硬编码任何映射（D19）。
-  const stackLabel =
-    taxonomy.data?.stacks.find((node) => node.stack === resource.stack)?.label?.zh ?? resource.stack;
+  // 面包屑的显示名来自 taxonomy 的 label（`content/_meta/taxonomy.yml`）；按当前界面语言
+  // 取 `zh`/`en`，拿不到就退回原始 stack / category 值（D28：不硬编码语言、不拼 slug）。
+  const language = i18n.resolvedLanguage ?? i18n.language;
+  const stackNode = taxonomy.data?.stacks.find((node) => node.stack === resource.stack);
+  const stackLabel = localizedLabel(stackNode?.label, language) ?? resource.stack;
+  const categoryLabel =
+    localizedLabel(
+      stackNode?.categories.find((item) => item.category === resource.category)?.label,
+      language,
+    ) ?? resource.category;
 
   return (
     <section className="page-enter rp">
@@ -116,7 +123,7 @@ export default function ResourcePage() {
         </Link>
         <span aria-hidden="true">/</span>
         <Link to={libraryHref({ stack: resource.stack, category: resource.category })}>
-          {resource.category}
+          {categoryLabel}
         </Link>
       </nav>
 
