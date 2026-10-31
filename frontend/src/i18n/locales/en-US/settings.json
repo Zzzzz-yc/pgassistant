@@ -54,7 +54,7 @@
     },
     "maxTokens": {
       "label": "Max output tokens",
-      "hint": "256–8192, default 1024",
+      "hint": "256–8192, default 4096",
       "invalid": "Must be an integer between 256 and 8192"
     },
     "save": "Save model",

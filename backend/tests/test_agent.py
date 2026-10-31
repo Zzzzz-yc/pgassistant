@@ -20,8 +20,9 @@ import pytest
 
 from app.api import agent
 from app.db.connection import connect
-from app.services import llm_client, plan_service, plan_validate, planner, secrets, sse
+from app.services import llm_client, plan_service, plan_validate, planner, secrets
 from app.services import router as router_pkg
+from app.services import settings_service, sse
 from app.services.llm_client import LLMClient, LLMConfig
 from app.services.router.classify import classify
 
@@ -1307,6 +1308,8 @@ def test_chat_advice_streams_deltas(client, token, llm):
 def test_default_max_tokens_is_4096():
     """默认 4096；契约的 256–8192 夹取范围不变（用户已保存的旧值也不迁移）。"""
     assert llm_client.DEFAULT_MAX_TOKENS == 4096
+    # 单一事实来源：settings_service 不再自己写一份 1024（Lead 批准的跨模块例外）
+    assert settings_service.DEFAULT_MAX_TOKENS == llm_client.DEFAULT_MAX_TOKENS
     assert llm_client.LLMConfig("http://x/v1", "sk-key", "m").max_tokens == 4096
     assert llm_client._build_config("http://x/v1", "m", "sk-key", 0.3, None).max_tokens \
         == 4096
@@ -1314,6 +1317,29 @@ def test_default_max_tokens_is_4096():
         == 256
     assert llm_client._build_config("http://x/v1", "m", "sk-key", 0.3, 99999).max_tokens \
         == 8192
+
+
+def test_settings_default_max_tokens_is_4096(client, token):
+    """从未保存过 `llm.max_tokens` 时，`GET /api/settings` 回 4096。"""
+    resp = client.get("/api/settings", headers=headers(token))
+    assert resp.status_code == 200
+    assert resp.json()["llm"]["max_tokens"] == 4096
+
+
+def test_settings_keeps_saved_max_tokens(client, token, db_path):
+    """用户已经保存过的旧值（1024）不做迁移，读出来仍是 1024。"""
+    conn = connect(db_path)
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO settings (key, value, updated_at) VALUES (?,?,?)",
+                ("llm.max_tokens", "1024", "2026-10-30T00:00:00+00:00"),
+            )
+    finally:
+        conn.close()
+    resp = client.get("/api/settings", headers=headers(token))
+    assert resp.status_code == 200
+    assert resp.json()["llm"]["max_tokens"] == 1024
 
 
 def test_advice_follows_configured_max_tokens(client, token, llm, monkeypatch):

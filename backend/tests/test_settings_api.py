@@ -123,7 +123,7 @@ def test_get_settings_defaults(client, auth):
 
     assert body["llm"]["base_url"] is None
     assert body["llm"]["temperature"] == 0.3
-    assert body["llm"]["max_tokens"] == 1024
+    assert body["llm"]["max_tokens"] == 4096
     assert body["llm"]["api_key_masked"] is None
     assert body["embedding"]["api_key_masked"] is None
     assert body["language"] == "zh-CN"
