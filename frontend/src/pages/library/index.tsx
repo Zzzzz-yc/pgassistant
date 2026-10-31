@@ -47,7 +47,7 @@ import {
   useScrollRestore,
   useTaxonomyData,
 } from "@/features/library/hooks";
-import { localizedLabel } from "@/features/library/labels";
+import { localizedLabel } from "@/lib/labels";
 import { mediaUrl, resourceHref } from "@/features/library/media";
 
 import "./library.css";

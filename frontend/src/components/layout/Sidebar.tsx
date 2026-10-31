@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { localizedLabel } from "@/lib/labels";
 import { useTaxonomy } from "@/lib/query";
 
 export interface SidebarProps {
@@ -78,7 +79,10 @@ interface ChapterTreeProps {
 }
 
 function ChapterTree({ taxonomy, onNavigate }: ChapterTreeProps) {
-  const { t } = useTranslation("nav");
+  const { t, i18n } = useTranslation("nav");
+  // 显示名按当前界面语言取 `label` 的 `zh`/`en`，拿不到回退原始 key（D28）；
+  // 链接参数始终是 stack / category 的 key，不能用显示名代替。
+  const language = i18n.resolvedLanguage ?? i18n.language;
   const { data, isLoading, isError } = taxonomy;
 
   if (isLoading) {
@@ -104,12 +108,12 @@ function ChapterTree({ taxonomy, onNavigate }: ChapterTreeProps) {
             onClick={onNavigate}
           >
             <Layers size={13} aria-hidden="true" style={{ display: "inline", marginRight: "4px" }} />
-            {stack.label?.zh ?? stack.stack}
+            {localizedLabel(stack.label, language) ?? stack.stack}
             <span className="sidebar__count tnum">{stack.total}</span>
           </Link>
           {stack.categories.map((category) => (
             <span className="sidebar__item" key={`${stack.stack}/${category.category}`}>
-              {category.category}
+              {localizedLabel(category.label, language) ?? category.category}
               <span className="sidebar__count tnum">{category.count}</span>
             </span>
           ))}

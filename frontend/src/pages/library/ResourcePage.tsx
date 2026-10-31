@@ -27,7 +27,7 @@ import type { ResourceDetail, ResourceSummary, TocNode } from "@/types/api";
 
 import { AddToPlanDialog } from "@/features/library/AddToPlanDialog";
 import { getScrollContainer, useRelated, useResource, useTaxonomyData } from "@/features/library/hooks";
-import { localizedLabel } from "@/features/library/labels";
+import { localizedLabel } from "@/lib/labels";
 import { libraryHref, mediaUrl, resourceHref } from "@/features/library/media";
 import { CodeRunnerPanel } from "@/features/runner/components/CodeRunnerPanel";
 import { RunButton } from "@/features/runner/components/RunButton";
