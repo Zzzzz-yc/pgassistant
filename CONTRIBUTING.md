@@ -54,7 +54,28 @@ python -m pytest -q --basetemp=data/.pytest-tmp   # 该路径已在 .gitignore
 `data/` 是运行时目录，测试**不得**污染它；需要隔离时用 `PG_DB` 指到临时文件。
 单独跑某个用例：`python -m pytest backend/tests/test_search.py -q -k 闭包`。
 
-## 3. 内容维护
+## 3. 项目结构
+
+```
+.
+├─ start.cmd / start.sh / stop.cmd / stop.sh   # 一键启动与停止
+├─ launch.py                                   # 启动器逻辑（环境准备、端口、进程）
+├─ backend/                                    # FastAPI 后端
+│  ├─ app/                                     # 接口、服务、数据库迁移与提示词
+│  ├─ scripts/                                 # 建索引、内容校验、自检
+│  ├─ tests/                                   # pytest
+│  └─ requirements*.txt
+├─ frontend/                                   # React + Vite（dist/、node_modules/ 不入库）
+├─ content/                                    # 内容库：_meta/ 手写元数据随仓库，正文本地生成
+├─ tools/                                      # 内容准备与转换脚本
+├─ docs/contracts/                             # 接口、数据库、模块契约
+└─ data/                                       # 运行时数据（不入库）
+```
+
+内容正文由 `tools/prepare_content.py` 生成，`content/_meta/` 是手写的分类名、计划模板和分词词典，
+随仓库维护。`data/` 存数据库、私有资料、日志、备份与运行状态，不提交。
+
+## 4. 内容维护
 
 - **`content/` 的正文由 `tools/prepare_content.py` 生成，不要手改**：重建用
   `python tools/prepare_content.py --force`（见 [tools/README.md](tools/README.md)）。
@@ -67,7 +88,7 @@ python -m pytest -q --basetemp=data/.pytest-tmp   # 该路径已在 .gitignore
 - 媒体：WebP、长边 ≤1600px、单文件 ≤300KB、仓库总量 ≤50MB；**视频不落仓库**，只存 url。
 - 改完跑 `validate_content.py`；改了内容再重跑 `bootstrap_index.py`。
 
-## 4. 提交前检查
+## 5. 提交前检查
 
 - [ ] `python backend/scripts/validate_content.py` 退出码 0
 - [ ] `python -m pytest -q` 全绿
@@ -81,7 +102,7 @@ python -m pytest -q --basetemp=data/.pytest-tmp   # 该路径已在 .gitignore
 提交信息用 Conventional Commits：`feat(scope): ...`、`fix(scope): ...`、`docs(contract): ...`、`chore: ...`。
 一个提交只做一件事；契约变更与实现变更分开提交，方便回滚。
 
-## 5. 不要提交 data/
+## 6. 不要提交 data/
 
 `data/` 存数据库、私有资料、备份、日志与 `runtime.json`，全是本机私产，已在 `.gitignore` 里。
 删除 `data/` 即彻底清除你的对话与计划。备份含对话内容，属隐私数据，同样不入库。
