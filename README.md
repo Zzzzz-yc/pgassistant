@@ -36,19 +36,23 @@ M0–M6 全部落地。
 
 ```bash
 # Windows 一键：建 .venv、装依赖、npm ci、npm run build、索引、起服务
-.\start.cmd              # 推荐入口：用 -ExecutionPolicy Bypass 调 start.ps1，未签名也能跑
-.\start.ps1              # 执行策略已放行本地脚本时等价
-# 只起服务，不开浏览器
-.\start.cmd -NoBrowser
+.\start.cmd
+# 只起服务，不开浏览器（旧写法 -NoBrowser 同样可用）
+.\start.cmd --no-browser
 # 开发态：后端 + Vite 热更新（见下）
-.\start.cmd -Dev
+.\start.cmd --dev
+# 停止（按 data/runtime.json 的 pid 杀进程树，再用端口兜底；可重复执行）
+.\stop.cmd
 # macOS / Linux
 ./start.sh
+./stop.sh
 ```
 
-`start.ps1` 没有 Authenticode 签名。执行策略为 `AllSigned`（或脚本带“下载自互联网”标记）时，
-直接运行会报“未对文件 … 进行数字签名，无法在当前系统上运行该脚本”。`start.cmd` 只在启动这
-一个 PowerShell 进程时加 `-ExecutionPolicy Bypass`：不改系统设置、不装证书，参数原样透传。
+启动与停止逻辑集中在 `launch.py`（Python 标准库单文件），`start.cmd` / `stop.cmd` /
+`start.sh` / `stop.sh` 只负责找到 Python 并转发参数。**不再依赖 PowerShell 脚本**，
+也就没有执行策略或数字签名的限制。直接 `python launch.py` / `python launch.py stop` 等价；
+旧参数写法 `-NoBrowser` / `-Dev` 与 `--no-browser` / `--dev` 都认。调试时可用
+`--port <n>` 固定端口、`--dry-run` 只打印将要执行的步骤。
 
 脚本会在 8000–8010 里挑一个空闲端口，把实际地址写进 `data/runtime.json` 并打开浏览器。
 选定端口会同时传给 uvicorn 和 `PG_PORT`：`core/config.py` 按它生成 Origin 白名单，
@@ -91,10 +95,10 @@ python -m uvicorn app.main:app --app-dir backend --port 8000
 ### 开发态（Vite 热更新）
 
 ```bash
-.\start.cmd -Dev        # 后端（8000–8010 的空闲端口）+ Vite :5173，自动开 :5173
+.\start.cmd --dev       # 后端（8000–8010 的空闲端口）+ Vite :5173，自动开 :5173
 ```
 
-`-Dev` 会设 `PG_DEV_ORIGINS=http://127.0.0.1:5173`，并让 Vite 把 **`/api` 与 `/media`** 都代理到后端：
+`--dev`（旧写法 `-Dev`）会设 `PG_DEV_ORIGINS=http://127.0.0.1:5173`，并让 Vite 把 **`/api` 与 `/media`** 都代理到后端：
 
 - `/api` 代理：否则写请求的 Origin 不在白名单里。
 - `/media` 代理：`<img>` 带不了 `X-App-Token`，内容媒体走免令牌的 `/media/*`；Vite 不代理会把它
