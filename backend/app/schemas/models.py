@@ -210,6 +210,9 @@ class LocalizedLabel(_Model):
 class CategoryNode(_Model):
     category: TokenStr
     count: int = Field(ge=0)
+    # 加法式扩展（D28）：分类的本地化显示名，来自 content/_meta/taxonomy.yml。
+    # 未登记 / 文件缺失时为 None，前端必须回退显示 `category`，不得硬编码某一种语言。
+    label: LocalizedLabel | None = None
 
 
 class StackNode(_Model):
