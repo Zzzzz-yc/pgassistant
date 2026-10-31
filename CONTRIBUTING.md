@@ -9,9 +9,11 @@
 
 ```bash
 # Windows 一键（建 .venv、装依赖、npm ci、npm run build、索引、起服务）
-.\start.ps1
+.\start.cmd
+.\stop.cmd
 # macOS / Linux
 ./start.sh
+./stop.sh
 ```
 
 手动等价命令：
@@ -28,7 +30,7 @@ python -m uvicorn app.main:app --app-dir backend --port 8000
 开发态（Vite :5173 热更新 + 后端 :8000）：
 
 ```bash
-.\start.ps1 -Dev
+.\start.cmd --dev
 ```
 
 Vite 只代理 `/api` 与 `/media`。**`/media` 这条不能少**：`<img>` 带不了 `X-App-Token`，不代理就会在

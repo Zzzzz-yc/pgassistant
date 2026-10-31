@@ -2,33 +2,45 @@
 setlocal EnableExtensions
 rem pgassistant one-click launcher for Windows.
 rem
-rem Why this file exists: start.ps1 is an ordinary project script with no
-rem Authenticode signature. On machines whose execution policy is AllSigned
-rem (or RemoteSigned with a downloaded, mark-of-the-web start.ps1) PowerShell
-rem refuses to run it and reports that the file is not digitally signed.
-rem This launcher starts the same script with -ExecutionPolicy Bypass for
-rem this one process only, so nothing system-wide is changed and no
-rem certificate has to be installed.
+rem All launcher logic lives in launch.py, one implementation shared by
+rem Windows / macOS / Linux. This file only finds a Python >= 3.11 and
+rem forwards every argument unchanged. No PowerShell script is involved,
+rem so there is no execution-policy / digital-signature problem anymore.
 rem
-rem Args are forwarded unchanged, so these all work:
 rem   start.cmd
-rem   start.cmd -NoBrowser
-rem   start.cmd -Dev
+rem   start.cmd -NoBrowser     (same as --no-browser)
+rem   start.cmd -Dev           (same as --dev)
+rem   start.cmd --port 8020
+rem   stop.cmd                 (stops the instance recorded in data\runtime.json)
+rem
+rem Python lookup: the official py launcher first, then python on PATH.
+rem If neither works, the message says where to install Python.
 
-set "PS1=%~dp0start.ps1"
-if not exist "%PS1%" (
-    echo [start.cmd] start.ps1 was not found next to this launcher.
+set "PYEXE="
+where py >nul 2>nul
+if not errorlevel 1 (
+    py -3 -c "import sys" >nul 2>nul
+    if not errorlevel 1 set "PYEXE=py -3"
+)
+if not defined PYEXE (
+    where python >nul 2>nul
+    if not errorlevel 1 (
+        python -c "import sys" >nul 2>nul
+        if not errorlevel 1 set "PYEXE=python"
+    )
+)
+if not defined PYEXE (
+    echo [start.cmd] Python not found. Install Python 3.11+ from https://www.python.org/downloads/ and run this file again.
     pause
     exit /b 1
 )
 
-powershell.exe -NoProfile -NoLogo -ExecutionPolicy Bypass -File "%PS1%" %*
+%PYEXE% "%~dp0launch.py" %*
 set "RC=%errorlevel%"
 
 if not "%RC%"=="0" (
     echo.
-    echo [start.cmd] start.ps1 exited with code %RC%. Read the error above.
+    echo [start.cmd] launch.py exited with code %RC%. Read the error above.
     pause
 )
-
 endlocal & exit /b %RC%
