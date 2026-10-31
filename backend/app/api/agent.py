@@ -535,8 +535,11 @@ async def _adjust_events(conn, payload: AgentChatRequest, decision: RouteDecisio
                          message: str, llm: LLMClient):
     plan_id = payload.page_context.plan_id if payload.page_context else None
     if not plan_id:
+        # 没有 plan_id 时发的是 CLARIFY 文本回复（按形态归入 D26 §26.6 第 2 条），要落库
         yield SseDeltaData(text=clarify_text(payload.locale))
-        yield _done(decision, kind="clarify")
+        message_id = _save_message(conn, "assistant", clarify_text(payload.locale),
+                                   intent=decision.intent)
+        yield _done(decision, kind="clarify", message_id=message_id)
         return
     try:
         plan = plan_service.get_plan(conn, plan_id)

@@ -1577,6 +1577,23 @@ def test_chat_plan_direction_clarify_persists_assistant_row(client, token, db_pa
         text=router_pkg.plan_clarify_text("zh-CN"), kind="clarify")
 
 
+def test_chat_plan_adjust_clarify_persists_assistant_row(client, token, db_path, llm):
+    """无 `page_context.plan_id` 的 PLAN_ADJUST 追问也是 CLARIFY 文本回复。"""
+    llm.responses.append(chat_response(classification_payload(
+        intent="PLAN_ADJUST",
+        slots={"goal": "前端入门", "weeks": 4, "weekly_hours": 1,
+               "level": "beginner", "stack": None})))
+    frames = _post_chat(client, token, "阶段太赶了，压缩一下")
+    done = frames[-1][1]
+    assert done["kind"] == "clarify"
+    assert done["message_id"] is not None
+    rows = _messages(db_path)
+    assert [row["role"] for row in rows] == ["user", "assistant"]
+    assert rows[1]["id"] == done["message_id"]
+    assert rows[1]["content"] == router_pkg.clarify_text("zh-CN")
+    assert rows[1]["intent"] == "PLAN_ADJUST"
+
+
 def test_chat_search_does_not_persist_assistant_row(client, token, db_path):
     """对照：search 只发结构化结果，不落 assistant 行。"""
     frames = _post_chat(client, token, "有没有讲数组的文章")
