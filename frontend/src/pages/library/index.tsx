@@ -47,6 +47,7 @@ import {
   useScrollRestore,
   useTaxonomyData,
 } from "@/features/library/hooks";
+import { localizedLabel } from "@/lib/labels";
 import { mediaUrl, resourceHref } from "@/features/library/media";
 
 import "./library.css";
@@ -78,7 +79,7 @@ function readQuery(params: URLSearchParams): ResourceListQuery {
 }
 
 export default function LibraryPage() {
-  const { t } = useTranslation("library");
+  const { t, i18n } = useTranslation("library");
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const query = useMemo(() => readQuery(params), [params]);
@@ -149,16 +150,19 @@ export default function LibraryPage() {
   const hasQuery = Boolean(query.q);
   const zeroResult = !list.isLoading && !list.error && hasQuery && total === 0;
 
+  // 显示名按当前界面语言取 label，拿不到回退原始 key（D28；值仍是 key）。
+  const language = i18n.resolvedLanguage ?? i18n.language;
+
   const stackOptions = useMemo<SelectOption[]>(() => {
     const all: SelectOption[] = [{ value: ALL, label: t("filter.all") }];
     for (const node of taxonomy.data?.stacks ?? []) {
       all.push({
         value: node.stack,
-        label: `${node.label?.zh ?? node.stack} · ${node.total}`,
+        label: `${localizedLabel(node.label, language) ?? node.stack} · ${node.total}`,
       });
     }
     return all;
-  }, [taxonomy.data, t]);
+  }, [taxonomy.data, t, language]);
 
   const categoryOptions = useMemo<SelectOption[]>(() => {
     const all: SelectOption[] = [{ value: ALL, label: t("filter.all") }];
@@ -166,17 +170,19 @@ export default function LibraryPage() {
     const scoped = query.stack ? stacks.filter((node) => node.stack === query.stack) : stacks;
     const seen = new Set<string>();
     for (const node of scoped) {
+      const stackName = localizedLabel(node.label, language) ?? node.stack;
       for (const category of node.categories) {
         if (seen.has(category.category)) continue;
         seen.add(category.category);
+        const categoryName = localizedLabel(category.label, language) ?? category.category;
         all.push({
           value: category.category,
-          label: query.stack ? category.category : `${node.stack} / ${category.category}`,
+          label: query.stack ? categoryName : `${stackName} / ${categoryName}`,
         });
       }
     }
     return all;
-  }, [taxonomy.data, query.stack, t]);
+  }, [taxonomy.data, query.stack, t, language]);
 
   const typeOptions = useMemo<SelectOption[]>(() => {
     // 选项来源是接口返回值，不写死 8 值枚举（D19）

@@ -19,6 +19,7 @@ import { ErrorState } from "@/components/business/ErrorState";
 import { DurationLabel } from "@/components/business/DurationLabel";
 import { TypeIcon } from "@/components/business/TypeIcon";
 import { Button, Card, IconButton, Input, Skeleton } from "@/components/ui";
+import { localizedLabel } from "@/lib/labels";
 import type { ItemRead, StackNode } from "@/types/api";
 
 import {
@@ -41,7 +42,10 @@ interface PendingItem {
 }
 
 export default function HomePage() {
-  const { t } = useTranslation("library");
+  const { t, i18n } = useTranslation("library");
+  // 方向卡片的显示名按当前界面语言取 `label`，拿不到回退 stack 原值（D28）；
+  // 卡片跳转仍用 `node.stack` 作参数。
+  const language = i18n.resolvedLanguage ?? i18n.language;
   const navigate = useNavigate();
   const taxonomy = useTaxonomyData();
   const plans = useActivePlan();
@@ -180,7 +184,9 @@ export default function HomePage() {
               <li key={node.stack}>
                 <Link className="home__card-link" to={libraryHref({ stack: node.stack })}>
                   <Card hoverable className="home__card">
-                    <span className="home__card-title">{node.label?.zh ?? node.stack}</span>
+                    <span className="home__card-title">
+                      {localizedLabel(node.label, language) ?? node.stack}
+                    </span>
                     <span className="home__card-count">
                       {t("home.count", { total: node.total })}
                     </span>

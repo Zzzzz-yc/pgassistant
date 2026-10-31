@@ -125,6 +125,12 @@ export interface LocalizedLabel {
 export interface CategoryNode {
   category: string;
   count: number;
+  /**
+   * 分类的本地化显示名（D28），来自 `content/_meta/taxonomy.yml`。
+   * 未登记或后端降级时为 null/缺席；前端**必须**回退显示 `category`，
+   * 并按当前界面语言取 `zh`/`en`，不得硬编码某一种语言。
+   */
+  label?: LocalizedLabel | null;
 }
 
 export interface StackNode {
