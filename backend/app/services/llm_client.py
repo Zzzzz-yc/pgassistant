@@ -30,6 +30,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
@@ -51,6 +52,21 @@ NETWORK_BACKOFF = 0.3
 MAX_BACKOFF = 5.0
 #: 默认超时（§7.9：60s，且**不自动重试**）。
 DEFAULT_TIMEOUT = 60.0
+#: 非 2xx 时保留的上游响应体上限（字符）。只进 `message` / `detail`，**不进日志**。
+UPSTREAM_BODY_LIMIT = 500
+#: 探针的 token 预算。推理型模型会先把预算花在 `reasoning_content` 上：
+#: 实测 `deepseek-flash` 在 max_tokens=8/32 时正文为空（finish_reason=length），
+#: 64 起才有正文；128 留出稳定余量。探针只发 1 条 "ping"，成本可忽略。
+PROBE_MAX_TOKENS = 128
+
+#: 按状态码给的可操作 hint（覆盖 `LLM_MESSAGES` 里按错误码的默认文案）。
+#: 错误码与异常类型不变（MODULES §4.3 / API.md §5），这里只补可读性。
+STATUS_HINTS: dict[int, str] = {
+    400: "检查模型名是否与上游一致，以及 max_tokens / temperature 是否在上游允许范围",
+    401: "检查密钥是否有效、是否与 base_url 指向的服务商匹配（到设置页更新 api_key）",
+    403: "密钥无权访问该模型或已过期，到设置页检查 api_key 与模型权限",
+    404: "检查 base_url：多数服务需要以 /v1 结尾，不要多拼一层路径或多余斜杠",
+}
 
 #: 全局并发闸门。`asyncio.Semaphore` 在 3.10+ 不绑定 loop，可在导入期创建。
 _SEMAPHORE = asyncio.Semaphore(2)
@@ -96,14 +112,18 @@ class LLMError(Exception):
     code = "LLM_UNAVAILABLE"
 
     def __init__(self, message: str | None = None, *, status_code: int | None = None,
-                 detail: Any | None = None) -> None:
+                 detail: Any | None = None, hint: str | None = None) -> None:
         self.status_code = status_code
         self.detail = detail
+        self._hint = hint
         self.message = message or LLM_MESSAGES.get(self.code, ("模型调用失败", ""))[0]
         super().__init__(self.message)
 
     @property
     def hint(self) -> str:
+        #: 调用点给的按状态码提示优先（如 404 → 查 base_url）；否则回退错误码级文案。
+        if self._hint:
+            return self._hint
         return LLM_MESSAGES.get(self.code, ("", ""))[1]
 
 
@@ -119,9 +139,10 @@ class LLMRateLimited(LLMError):
     code = "LLM_429"
 
     def __init__(self, message: str | None = None, *, retry_after: float = 0.0,
-                 status_code: int | None = 429, detail: Any | None = None) -> None:
+                 status_code: int | None = 429, detail: Any | None = None,
+                 hint: str | None = None) -> None:
         self.retry_after = float(retry_after or 0.0)
-        super().__init__(message, status_code=status_code, detail=detail)
+        super().__init__(message, status_code=status_code, detail=detail, hint=hint)
 
 
 class LLMTimeout(LLMError):
@@ -339,6 +360,98 @@ def _retry_after(response: httpx.Response, fallback: float) -> float:
     return min(MAX_BACKOFF, max(0.0, fallback))
 
 
+#: 上游偶尔会在错误体里回显密钥；进 message/detail 前统一脱敏（§13.1）。
+_SECRET_PATTERN = re.compile(r"sk-[A-Za-z0-9_\-]{6,}")
+
+
+def _redact_secrets(text: str) -> str:
+    return _SECRET_PATTERN.sub("sk-****", text or "")
+
+
+async def _read_error_body(response: httpx.Response,
+                           limit: int = UPSTREAM_BODY_LIMIT) -> str:
+    """读非 2xx 的响应体并截断到 `limit` 字符。读失败不能吞掉原错误码。"""
+    try:
+        raw = await response.aread()
+    except Exception:                       # 上游半途断开 / 连接已被重置
+        return ""
+    if not raw:
+        return ""
+    text = _redact_secrets(raw.decode("utf-8", "replace"))
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "…"
+
+
+def _upstream_reason(body: str) -> dict[str, str]:
+    """从非 2xx 响应体提取可读原因。
+
+    兼容 OpenAI 形状 `{"error": {"message", "code", "type"}}`、`{"error": "..."}`
+    （字符串）、`{"message"/"detail": "..."}`，以及非 JSON 的纯文本 / HTML。
+    提取不出结构化字段时把整体（压空白后）当 `message`。
+    """
+    text = (body or "").strip()
+    if not text:
+        return {}
+    payload: Any = None
+    try:
+        payload = json.loads(text)
+    except ValueError:
+        payload = None
+
+    reason: dict[str, str] = {}
+    if isinstance(payload, dict):
+        err = payload.get("error")
+        if isinstance(err, dict):
+            for key in ("message", "code", "type"):
+                value = err.get(key)
+                if isinstance(value, (str, int, float)) and str(value).strip():
+                    reason[key] = str(value).strip()
+        elif isinstance(err, str) and err.strip():
+            reason["message"] = err.strip()
+        if "message" not in reason:
+            for key in ("message", "detail"):
+                value = payload.get(key)
+                if isinstance(value, str) and value.strip():
+                    reason["message"] = value.strip()
+                    break
+    if "message" not in reason:
+        snippet = " ".join(text.split())
+        if snippet:
+            reason["message"] = snippet
+    return reason
+
+
+def _compose_error_message(base: str, status: int, reason: dict[str, str]) -> str:
+    """`<基础文案>（HTTP <状态码>）：<上游原因>`；无上游原因时与旧文案一致。"""
+    message = "%s（HTTP %d）" % (base, status)
+    detail_text = reason.get("message")
+    if detail_text:
+        message += "：" + detail_text[:300]
+        if len(detail_text) > 300:
+            message += "…"
+    return message
+
+
+def _error_detail(status: int, body: str, reason: dict[str, str]) -> dict[str, Any]:
+    """把状态码、结构化原因与截断后的原文放进 `detail`（不写日志）。"""
+    detail: dict[str, Any] = {"status_code": status}
+    if reason:
+        detail["upstream"] = dict(reason)
+    if body:
+        detail["body"] = body
+    return detail
+
+
+def _probe_message(exc: LLMError) -> str:
+    """`POST /api/settings/test` 只回 `message` + `error_code`（无 hint 字段），
+    所以把按状态码的可操作提示拼进探针文案。"""
+    hint = exc.hint
+    if hint and hint not in exc.message:
+        return "%s（%s）" % (exc.message, hint)
+    return exc.message
+
+
 def strip_fences(text: str) -> str:
     """剥掉 ```json … ``` 围栏（§7.5：不支持 json_object 时的降级解析）。"""
     body = (text or "").strip()
@@ -423,28 +536,51 @@ class LLMClient:
                 wait = _retry_after(response, RATE_LIMIT_BACKOFF[
                     min(rate_limited, len(RATE_LIMIT_BACKOFF) - 1)
                 ])
+                body = await _read_error_body(response)
                 await response.aclose()
                 if rate_limited < RATE_LIMIT_RETRIES:
                     rate_limited += 1
                     await asyncio.sleep(wait)
                     continue
                 self._log_error("LLM_429", started, status)
-                raise LLMRateLimited(retry_after=wait, status_code=status)
+                reason = _upstream_reason(body)
+                raise LLMRateLimited(
+                    _compose_error_message(LLM_MESSAGES["LLM_429"][0], status, reason),
+                    retry_after=wait, status_code=status,
+                    detail=_error_detail(status, body, reason),
+                    hint=STATUS_HINTS.get(status),
+                )
 
             self._log_call(status, started)
             if 200 <= status < 300:
                 return response
+            # 非 2xx：先读上游响应体再关连接（否则 body 丢失，只剩状态码）。
+            body = await _read_error_body(response)
             await response.aclose()
+            reason = _upstream_reason(body)
+            detail = _error_detail(status, body, reason)
+            hint = STATUS_HINTS.get(status)
             if status in (401, 403):
-                raise LLMUnauthorized(status_code=status)
+                raise LLMUnauthorized(
+                    _compose_error_message(LLM_MESSAGES["LLM_401"][0], status, reason),
+                    status_code=status, detail=detail, hint=hint,
+                )
             if status >= 500:
-                raise LLMUnavailable(status_code=status)
+                raise LLMUnavailable(
+                    _compose_error_message(
+                        LLM_MESSAGES["LLM_UNAVAILABLE"][0], status, reason
+                    ),
+                    status_code=status, detail=detail, hint=hint,
+                )
             if response_format:
                 raise LLMFormatUnsupported(
-                    "上游不接受 response_format", status_code=status
+                    _compose_error_message("上游不接受 response_format", status, reason),
+                    status_code=status, detail=detail,
+                    hint=hint or "去掉 response_format 后用纯提示词重试",
                 )
             raise LLMBadOutput(
-                "上游拒绝了请求（HTTP %d）" % status, status_code=status
+                _compose_error_message("上游拒绝了请求", status, reason),
+                status_code=status, detail=detail, hint=hint,
             )
 
     def _log_call(self, status: int, started: float) -> None:
@@ -502,7 +638,11 @@ class LLMClient:
         message = first.get("message")
         text = message.get("content") if isinstance(message, dict) else None
         if not isinstance(text, str) or not text.strip():
-            raise LLMBadOutput("上游没有返回正文")
+            # 推理型模型会先把 max_tokens 花在 reasoning_content 上，正文因此为空。
+            raise LLMBadOutput(
+                "上游没有返回正文",
+                hint="检查 max_tokens 是否过小：推理型模型的 reasoning 会先占满预算",
+            )
 
         usage = data.get("usage")
         usage = usage if isinstance(usage, dict) else {}
@@ -593,14 +733,15 @@ class LLMClient:
         started = time.perf_counter()
         try:
             response = await self.chat(
-                [{"role": "user", "content": "ping"}], max_tokens=8, timeout=timeout
+                [{"role": "user", "content": "ping"}],
+                max_tokens=PROBE_MAX_TOKENS, timeout=timeout,
             )
         except LLMError as exc:
             return ProbeResult(
                 False,
                 int((time.perf_counter() - started) * 1000),
                 None,
-                exc.message,
+                _probe_message(exc),
                 exc.code,
             )
         return ProbeResult(
