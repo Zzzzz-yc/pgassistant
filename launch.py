@@ -49,7 +49,16 @@ import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+# 根目录必须按「程序放在哪」推导，而不是按 __file__：
+# PyInstaller 的 --onefile 会把 launch.py 解包到系统临时目录（sys._MEIPASS）再执行，
+# 此时 __file__ 指向 %TEMP%\_MEIxxxx，照它算 ROOT 就会去临时目录下找 backend/、
+# frontend/、content/、data/ 和 .venv/，全部找不到。frozen 模式下 sys.executable
+# 才是用户双击的那个 pgassistant.exe（onefile 不会改它的值），而 exe 固定放在仓库根，
+# 所以它的父目录就是仓库根；未打包时保持原来的 __file__ 逻辑。
+if getattr(sys, "frozen", False):
+    ROOT = Path(sys.executable).resolve().parent
+else:
+    ROOT = Path(__file__).resolve().parent
 FRONTEND = ROOT / "frontend"
 BACKEND = ROOT / "backend"
 VENV = ROOT / ".venv"

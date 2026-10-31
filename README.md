@@ -54,6 +54,9 @@ M0–M6 全部落地。
 旧参数写法 `-NoBrowser` / `-Dev` 与 `--no-browser` / `--dev` 都认。调试时可用
 `--port <n>` 固定端口、`--dry-run` 只打印将要执行的步骤。
 
+> 可选 `.\pgassistant.exe`（需本机先构建并签名）：双击运行单文件入口，发布者显示为
+> `pgassistant (local dev)`；构建与签名见 [docs/launcher-exe.md](docs/launcher-exe.md)。
+
 脚本会在 8000–8010 里挑一个空闲端口，把实际地址写进 `data/runtime.json` 并打开浏览器。
 选定端口会同时传给 uvicorn 和 `PG_PORT`：`core/config.py` 按它生成 Origin 白名单，
 只改 `--port` 不改 `PG_PORT` 时，非 8000 端口的写请求会被 403 `BAD_ORIGIN` 挡掉。

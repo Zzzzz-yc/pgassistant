@@ -38,6 +38,11 @@ dist/
 .vite/
 *.tsbuildinfo
 
+# PyInstaller 单文件构建产物（tools/build_exe.py 生成，本机产物不入库）
+pgassistant.exe
+build/
+*.spec
+
 # 日志与临时
 *.log
 logs/
