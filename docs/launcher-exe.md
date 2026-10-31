@@ -107,8 +107,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\sign_selfsigned.ps1
   证书文件            : <仓库根>\data\dev-codesign.cer
 ```
 
-**每次重新构建 exe 后都必须重新签名**：签名覆盖文件哈希，重新构建会让旧签名失效
-（`Get-AuthenticodeSignature` 会显示 `HashMismatch`）。
+**每次重新构建 exe 后都必须重新签名**：`build_exe.py` 会先删掉旧文件再重新生成，
+新文件里没有签名块，`Get-AuthenticodeSignature` 显示 `NotSigned`；只有已签名的文件被
+**原地**改写时才会显示 `HashMismatch`。两种情况结论相同——重建或改动后必须重签。
 
 ---
 
@@ -216,7 +217,7 @@ PyInstaller 的 onefile 产物是「自解压 + 内嵌 Python 运行时」结构
 |---|---|
 | `Could not create temporary directory!` | `%TEMP%` 不可写（安全软件、磁盘满、TEMP 指向无效路径）。换一个可写目录：`$env:TEMP='D:\temp'; $env:TMP=$env:TEMP`,再运行 |
 | 双击闪退、看不到报错 | exe 是 `--console` 构建的；从 cmd 运行 `.\pgassistant.exe` 看完整日志 |
-| `Status: HashMismatch` | exe 被重新构建/替换过，重新运行签名脚本 |
+| `Status: NotSigned` / `Status: HashMismatch` | `NotSigned`：exe 被重新构建/替换，新文件没有签名块；`HashMismatch`：已签名文件被原地修改。两者都重新运行签名脚本 |
 | `Status: UnknownError` / `NotTrusted` | 证书没导入当前用户的 `Root`；按第 4/5 节导入 `.cer` |
 | 签名脚本提示找不到 exe | 先运行 `tools\build_exe.py` |
 | 构建报没装 PyInstaller | `.venv\Scripts\python.exe -m pip install pyinstaller` |
