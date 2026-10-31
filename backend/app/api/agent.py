@@ -449,15 +449,22 @@ async def _chat_events(request: Request, payload: AgentChatRequest, message: str
             yield _done(decision_local, kind="text", message_id=message_id)
         elif intent == Intent.GREETING:
             yield SseDeltaData(text=greeting_text(payload.locale))
-            yield _done(decision_local, kind="text")
+            # 文本型回复落库（D26 §26.6）：落的就是实际发出去的常量话术
+            message_id = _save_message(conn, "assistant", greeting_text(payload.locale),
+                                       intent=intent)
+            yield _done(decision_local, kind="text", message_id=message_id)
         elif intent == Intent.CAPABILITY:
             yield SseDeltaData(text=capability_text(payload.locale))
-            yield _done(decision_local, kind="text")
+            message_id = _save_message(conn, "assistant", capability_text(payload.locale),
+                                       intent=intent)
+            yield _done(decision_local, kind="text", message_id=message_id)
         elif intent == Intent.CLARIFY:
             # 澄清卡片：选项在 intent.clarify_options 里（§4.3）。注入检测命中时也走这里，
-            # 那段输入绝不会送进模型。
+            # 那段输入绝不会送进模型。落库的是正文（澄清文案），不是选项列表。
             yield SseDeltaData(text=clarify_text(payload.locale))
-            yield _done(decision_local, kind="clarify")
+            message_id = _save_message(conn, "assistant", clarify_text(payload.locale),
+                                       intent=intent)
+            yield _done(decision_local, kind="clarify", message_id=message_id)
         elif intent == Intent.RESOURCE_SEARCH:
             query = query_from_search_text(message)
             result = _search_payload(conn, query)
@@ -466,7 +473,10 @@ async def _chat_events(request: Request, payload: AgentChatRequest, message: str
             if decision_local.needs_clarify:
                 # 信息不足（只说「我想学前端」）：方向性提问，常量话术，零 LLM（C2）。
                 yield SseDeltaData(text=plan_clarify_text(payload.locale))
-                yield _done(decision_local, kind="clarify")
+                message_id = _save_message(conn, "assistant",
+                                           plan_clarify_text(payload.locale),
+                                           intent=decision_local.intent)
+                yield _done(decision_local, kind="clarify", message_id=message_id)
             else:
                 async for event in _plan_events(conn, _plan_request(decision_local, message),
                                                 decision_local, llm):
