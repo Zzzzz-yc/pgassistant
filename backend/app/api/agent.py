@@ -72,8 +72,9 @@ LIMITS: dict[str, tuple[int, float]] = {
     "extract": (10, 60.0),
 }
 
-#: 建议任务的输出预算（§7.10：建议 1024）。
-ADVICE_MAX_TOKENS = 1024
+#: 建议任务的输出预算兜底（C3：默认 4096）。实际以模型配置的 `max_tokens` 为准，
+#: 只有拿不到配置（例如测试里的假 client）时才用它。
+ADVICE_MAX_TOKENS = 4096
 
 #: 检索型回答取多少张卡片（§7.3「检索 + 卡片列表」）。
 SEARCH_LIMIT = 10
@@ -568,7 +569,11 @@ async def _advice_events(request: Request, conn, decision: RouteDecision, messag
 
     chunks: list[str] = []
     aborted = False
-    agen = llm.stream(messages, max_tokens=ADVICE_MAX_TOKENS)
+    # C3：跟随设置里的 `llm.max_tokens`（默认 4096）；拿不到配置时退回常量。
+    configured = getattr(getattr(llm, "config", None), "max_tokens", None)
+    max_tokens = configured if isinstance(configured, int) and configured > 0 \
+        else ADVICE_MAX_TOKENS
+    agen = llm.stream(messages, max_tokens=max_tokens)
     try:
         async for chunk in agen:
             if not chunk:

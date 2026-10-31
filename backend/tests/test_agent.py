@@ -1303,6 +1303,31 @@ def test_chat_advice_streams_deltas(client, token, llm):
     assert frames[-1][1]["usage"]["estimated"] is True
 
 
+# ------------------------------------------------- 默认输出预算（C3）
+def test_default_max_tokens_is_4096():
+    """默认 4096；契约的 256–8192 夹取范围不变（用户已保存的旧值也不迁移）。"""
+    assert llm_client.DEFAULT_MAX_TOKENS == 4096
+    assert llm_client.LLMConfig("http://x/v1", "sk-key", "m").max_tokens == 4096
+    assert llm_client._build_config("http://x/v1", "m", "sk-key", 0.3, None).max_tokens \
+        == 4096
+    assert llm_client._build_config("http://x/v1", "m", "sk-key", 0.3, 100).max_tokens \
+        == 256
+    assert llm_client._build_config("http://x/v1", "m", "sk-key", 0.3, 99999).max_tokens \
+        == 8192
+
+
+def test_advice_follows_configured_max_tokens(client, token, llm, monkeypatch):
+    """建议不再写死 1024：设置里存了什么就用什么（这里用 env 覆盖来证明）。"""
+    monkeypatch.setenv("PG_LLM_MAX_TOKENS", "2048")
+    llm.responses.append(chat_response(classification_payload(
+        intent="ADVICE", slots=None)))
+    llm.responses.append(stream_response(["先学基础。"]))
+    resp = client.post("/api/agent/chat", headers=headers(token),
+                       json={"message": "学 Java 还是 Go"})
+    assert resp.status_code == 200
+    assert llm.body(1)["max_tokens"] == 2048
+
+
 def test_chat_rate_limited(client, token, frozen_clock):
     for _ in range(agent.LIMITS["chat"][0]):
         resp = client.post("/api/agent/chat", headers=headers(token),
@@ -1429,8 +1454,10 @@ def test_chat_disconnect_closes_upstream():
     class FakeLLM:
         def __init__(self):
             self.closed = False
+            self.max_tokens: int | None = None
 
         async def stream(self, messages, *, max_tokens):
+            self.max_tokens = max_tokens
             try:
                 for chunk in ("第一块", "第二块"):
                     yield chunk
@@ -1445,7 +1472,6 @@ def test_chat_disconnect_closes_upstream():
             intent=router_pkg.Intent.ADVICE, confidence=0.8, source="llm")
         payload = agent.AgentChatRequest(message="给点建议")
         events = []
-        fake_llm = FakeLLM()
         async for event in agent._advice_events(
             FakeRequest(), None, decision, "给点建议", payload, fake_llm
         ):
@@ -1453,7 +1479,10 @@ def test_chat_disconnect_closes_upstream():
         await fake_llm.aclose()
         return events
 
+    fake_llm = FakeLLM()
     events = asyncio.run(go())
     assert closed["value"] is True
     assert events[-1].aborted is True
     assert events[-1].finish_reason == "aborted"
+    # 没有 config 的假 client：退回常量 4096，而不是旧的 1024（C3）
+    assert fake_llm.max_tokens == agent.ADVICE_MAX_TOKENS == 4096

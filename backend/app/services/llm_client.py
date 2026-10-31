@@ -52,6 +52,10 @@ NETWORK_BACKOFF = 0.3
 MAX_BACKOFF = 5.0
 #: 默认超时（§7.9：60s，且**不自动重试**）。
 DEFAULT_TIMEOUT = 60.0
+#: 默认 `max_tokens`（C3）：`deepseek-flash` 这类推理模型会先把预算花在 reasoning 上，
+#: 1024 时正文经常被挤空/截断。契约上限 8192、下限 256 不变；用户已保存的旧值不迁移，
+#: 读到什么用什么（设置页的默认值由 M5 同步，见交付报告的 CONTRACT_IMPACT）。
+DEFAULT_MAX_TOKENS = 4096
 #: 非 2xx 时保留的上游响应体上限（字符）。只进 `message` / `detail`，**不进日志**。
 UPSTREAM_BODY_LIMIT = 500
 #: 探针的 token 预算。推理型模型会先把预算花在 `reasoning_content` 上：
@@ -180,7 +184,7 @@ class LLMConfig:
     api_key: str
     model: str
     temperature: float = 0.3
-    max_tokens: int = 1024
+    max_tokens: int = DEFAULT_MAX_TOKENS
 
 
 @dataclass(frozen=True)
@@ -275,7 +279,7 @@ def _build_config(base_url: str, model: str, api_key: str,
         model=model,
         # 0–2（API.md §3.20 的约束），越界按默认值处理而不是报错
         temperature=min(2.0, max(0.0, _as_float(temperature, 0.3))),
-        max_tokens=min(8192, max(256, _as_int(max_tokens, 1024))),
+        max_tokens=min(8192, max(256, _as_int(max_tokens, DEFAULT_MAX_TOKENS))),
     )
 
 
@@ -314,7 +318,7 @@ def load_llm_config(conn) -> LLMConfig | None:
         pick("model"),
         api_key,
         pick("temperature", 0.3),
-        pick("max_tokens", 1024),
+        pick("max_tokens", DEFAULT_MAX_TOKENS),
     )
 
 
@@ -347,7 +351,7 @@ def load_embedding_config(conn) -> LLMConfig | None:
         return default
 
     return _build_config(pick("base_url"), pick("model"),
-                         pick("api_key") or _read_secret_file(), 0.0, 1024)
+                         pick("api_key") or _read_secret_file(), 0.0, DEFAULT_MAX_TOKENS)
 
 
 # --------------------------------------------------------------- 工具
