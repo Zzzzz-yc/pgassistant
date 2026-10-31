@@ -786,7 +786,9 @@ class LLMConfigRead(_Model):
     base_url: str | None = Field(default=None, max_length=300)
     model: str | None = Field(default=None, max_length=100)
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=1024, ge=256, le=8192)
+    # 默认输出预算 4096（D29）：单一来源是 `services/llm_client.DEFAULT_MAX_TOKENS`，
+    # 契约层不 import 服务层，这里同步字面量；夹取 256–8192 不变。
+    max_tokens: int = Field(default=4096, ge=256, le=8192)
     api_key_masked: str | None = Field(default=None, max_length=40)
 
 
@@ -804,7 +806,10 @@ class LLMConfigWrite(_Request):
     model: str = Field(min_length=1, max_length=100)
     api_key: str | None = Field(default=None, min_length=8, max_length=200)
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=1024, ge=256, le=8192)
+    # 默认输出预算 4096（D29）。写接口尤其要一致：客户端 PUT 的 `llm` 组若省略
+    # `max_tokens`，Pydantic 会用这里的默认值补齐，`write_settings` 会把它整行写进
+    # `settings` 表——默认值写错就等于静默改写用户预算。夹取 256–8192 不变。
+    max_tokens: int = Field(default=4096, ge=256, le=8192)
 
 
 class EmbeddingConfigWrite(_Request):
