@@ -53,6 +53,13 @@ tmp/
 .DS_Store
 Thumbs.db
 
+# Obsidian / 本地编辑器配置：本人笔记库配置，含社区插件二进制，不入库
+.obsidian/
+.claudian/
+
+# git worktree 并行开发目录（每个分支一份工作副本，属本地产物）
+.worktrees/
+
 # 大文件（注意不要写 *.png / *.webp，否则 content/assets 会漏提交）
 *.mp4
 *.mov
