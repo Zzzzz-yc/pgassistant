@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from app.api import pages
+from app.services import llm_client, secrets
 
 INDEX_HTML = """<!doctype html>
 <html lang="zh-CN">
@@ -59,7 +60,11 @@ def test_root_serves_dist_index_with_token_meta(client, dist):
     assert matched.group(1).strip()
 
 
-def test_health_is_200_without_token(client, dist):
+def test_health_is_200_without_token(client, dist, monkeypatch):
+    # 同 test_security：health 的「模型配没配」不能依赖本机真实密钥。
+    monkeypatch.setattr(secrets, "load_secret", lambda name: None)
+    monkeypatch.setattr(llm_client, "_read_config_json", lambda: {})
+    monkeypatch.setattr(llm_client, "_read_secret_file", lambda: "")
     resp = client.get("/api/health")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("application/json")
