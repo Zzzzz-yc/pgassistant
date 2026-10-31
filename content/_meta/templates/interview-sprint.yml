@@ -1,0 +1,98 @@
+# 面试冲刺（4 周）：流程 → 数据结构与算法 → 系统设计 → 模拟与资源
+title: 面试冲刺 4 周
+goal: 四周内完成一轮系统的面试准备并做两次模拟面试
+weeks: 4
+weekly_hours: 3
+label:
+  zh: 面试冲刺
+  en: Interview Sprint
+summary: 面向已有一点基础的求职者，用 4 周把面试流程、知识清单与模拟练习过一遍。
+stages:
+  - title: 面试流程与准备
+    weeks: 1
+    description: 搞清楚面试考什么、怎么准备
+    items:
+      - title: 面试准备指南
+        resource_slug: cs-basics/interview/guide
+        est_minutes: 40
+        note: ""
+      - title: 面试流程与各轮准备
+        resource_slug: cs-basics/interview/interview-process
+        est_minutes: 40
+        note: ""
+      - title: 面试前后要做的检查
+        resource_slug: cs-basics/interview/before-interview
+        est_minutes: 40
+        note: ""
+      - title: 必备知识清单
+        resource_slug: cs-basics/interview/prerequisite
+        est_minutes: 40
+        note: ""
+  - title: 数据结构与算法要点
+    weeks: 1
+    description: 按知识清单补齐数据结构、树、图与排序
+    items:
+      - title: 数据结构清单
+        resource_slug: cs-basics/interview/data-structures
+        est_minutes: 50
+        note: ""
+      - title: 树结构清单
+        resource_slug: cs-basics/interview/trees
+        est_minutes: 50
+        note: ""
+      - title: 图与图算法清单
+        resource_slug: cs-basics/interview/graphs
+        est_minutes: 50
+        note: ""
+      - title: 排序算法清单
+        resource_slug: cs-basics/interview/sorting
+        est_minutes: 50
+        note: ""
+      - title: 算法复杂度清单
+        resource_slug: cs-basics/interview/complexity
+        est_minutes: 50
+        note: ""
+  - title: 系统设计与进阶
+    weeks: 1
+    description: 系统设计、进阶主题与练习
+    items:
+      - title: 系统设计面试
+        resource_slug: cs-basics/interview/final-interview
+        est_minutes: 60
+        note: ""
+      - title: 进阶知识
+        resource_slug: cs-basics/interview/advanced
+        est_minutes: 60
+        note: ""
+      - title: 拓展学习方向
+        resource_slug: cs-basics/interview/extra-topics
+        est_minutes: 60
+        note: ""
+      - title: 面试练习与挑战
+        resource_slug: cs-basics/interview/practice
+        est_minutes: 60
+        note: ""
+  - title: 模拟面试与资源
+    weeks: 1
+    description: 用模拟面试检验准备度，并整理长期学习资源
+    items:
+      - title: 视频与课程资源
+        resource_slug: cs-basics/interview/video-series
+        est_minutes: 30
+        note: ""
+      - title: 书籍清单
+        resource_slug: cs-basics/interview/books
+        est_minutes: 30
+        note: ""
+      - title: 语言学习资源
+        resource_slug: cs-basics/interview/programming-language-resources
+        est_minutes: 30
+        note: ""
+      - title: 找同学做一次模拟面试
+        resource_slug: null
+        est_minutes: 60
+        note: 自定义任务
+      - title: 复盘错题并更新知识清单
+        resource_slug: null
+        est_minutes: 30
+        note: 自定义任务

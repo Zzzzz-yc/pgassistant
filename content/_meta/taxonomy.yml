@@ -1,0 +1,82 @@
+# 技术栈 / 分类 / 难度 / 类型枚举 —— 单一事实来源（需求文档 §4.6）
+#
+# 数据来源：2026-10-30 从 data/app.db 实测（resources 里 is_deleted = 0 的 154 篇，
+# 按 stack + category 分组计数）。**不是凭空写的**，改内容后要重新核对。
+#
+# 规则 0（只注册有内容的分类）：下面每个 category 库里都至少有 1 篇；
+# 0 篇的分类一律不写，否则筛选器会出现永远空着的选项。
+#
+# 消费方：
+#   - GET /api/taxonomy 的 stacks[].label（label 由 M2 资料页补解析，D17/§6.2）；
+#   - 前端筛选器的选项（由接口返回，不写死在代码里）；
+#   - 计划模板与校验脚本的枚举来源。
+# 本文件由前端骨架（M0）建立，只作数据契约：索引逻辑（M1）不读它，也不改它。
+#
+# category_labels（D28）：每个 stack 下与 categories 并列，逐项登记该分类的 {zh, en} 显示名，
+#   供 GET /api/taxonomy 的 categories[].label 透传；缺任一语言键 / 未登记 / 本文件缺失或坏掉
+#   一律降级 null（接口仍 200，前端回退 category 原值）。本文件是 label 的唯一数据源。
+
+stacks:
+  cs-basics:
+    label: { zh: 计算机基础, en: CS Basics }
+    # 16 个分类，库里都非空（introduction 4 / complexity 7 / data-structure 7 /
+    # array-linkedlist 7 / stack-queue 6 / hashing 6 / tree 8 / heap 6 / graph 6 /
+    # searching 8 / sorting 13 / divide-conquer 7 / backtracking 7 /
+    # dynamic-programming 9 / greedy 7 / interview 16）
+    categories: [introduction, complexity, data-structure, array-linkedlist,
+                 stack-queue, hashing, tree, heap, graph, searching, sorting,
+                 divide-conquer, backtracking, dynamic-programming, greedy,
+                 interview]
+    # 与上面 categories 逐项对齐，不增不减（改分类时两处一起改）。
+    category_labels:
+      introduction: { zh: 入门, en: Introduction }
+      complexity: { zh: 复杂度, en: Complexity }
+      data-structure: { zh: 数据结构, en: Data Structures }
+      array-linkedlist: { zh: 数组与链表, en: Arrays & Linked Lists }
+      stack-queue: { zh: 栈与队列, en: Stacks & Queues }
+      hashing: { zh: 哈希, en: Hashing }
+      tree: { zh: 树, en: Trees }
+      heap: { zh: 堆, en: Heaps }
+      graph: { zh: 图, en: Graphs }
+      searching: { zh: 查找, en: Searching }
+      sorting: { zh: 排序, en: Sorting }
+      divide-conquer: { zh: 分治, en: Divide and Conquer }
+      backtracking: { zh: 回溯, en: Backtracking }
+      dynamic-programming: { zh: 动态规划, en: Dynamic Programming }
+      greedy: { zh: 贪心, en: Greedy }
+      interview: { zh: 面试准备, en: Interview Prep }
+
+  frontend:
+    label: { zh: 前端, en: Frontend }
+    # html-css 4 / javascript 7 / react 2 / typescript 1 / tooling 2
+    categories: [html-css, javascript, react, typescript, tooling]
+    category_labels:
+      html-css: { zh: HTML 与 CSS, en: HTML & CSS }
+      javascript: { zh: JavaScript, en: JavaScript }
+      react: { zh: React, en: React }
+      typescript: { zh: TypeScript, en: TypeScript }
+      tooling: { zh: 开发工具, en: Tooling }
+
+  backend:
+    label: { zh: 后端, en: Backend }
+    # http 4 / api-design 1 / database 4 / deployment 2
+    categories: [http, api-design, database, deployment]
+    category_labels:
+      http: { zh: HTTP, en: HTTP }
+      api-design: { zh: 接口设计, en: API Design }
+      database: { zh: 数据库, en: Database }
+      deployment: { zh: 部署, en: Deployment }
+
+  languages:
+    label: { zh: 编程语言, en: Languages }
+    # java 2 / python 1
+    categories: [java, python]
+    category_labels:
+      java: { zh: Java, en: Java }
+      python: { zh: Python, en: Python }
+
+levels: [beginner, intermediate, advanced]
+
+# 库内实际出现的 5 类。§4.6 的 video / course / book 目前 0 篇，按规则 0 不注册；
+# 等内容到位再加（types 是封闭集合，前端按它渲染类型徽章）。
+types: [article, docs, exercise, overview, summary]

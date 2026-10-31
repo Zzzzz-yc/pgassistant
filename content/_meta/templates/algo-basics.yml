@@ -1,0 +1,130 @@
+# 算法基础（8 周）：复杂度 → 线性结构 → 树/排序 → 分治贪心 → 动态规划
+title: 算法基础 8 周
+goal: 掌握常见数据结构与算法，能独立分析复杂度并手写核心实现
+weeks: 8
+weekly_hours: 3
+label:
+  zh: 算法基础
+  en: Algorithm Basics
+summary: 按难度递进安排：先建立复杂度与线性结构直觉，再进入树、排序、分治与动态规划。
+stages:
+  - title: 复杂度与数据结构基础
+    weeks: 1
+    description: 时间/空间复杂度、基本数据类型与递归
+    items:
+      - title: 时间复杂度
+        resource_slug: cs-basics/complexity/time_complexity
+        est_minutes: 60
+        note: ""
+      - title: 空间复杂度
+        resource_slug: cs-basics/complexity/space_complexity
+        est_minutes: 60
+        note: ""
+      - title: 基本数据类型
+        resource_slug: cs-basics/data-structure/basic_data_types
+        est_minutes: 40
+        note: ""
+      - title: 迭代与递归
+        resource_slug: cs-basics/complexity/iteration_and_recursion
+        est_minutes: 60
+        note: ""
+  - title: 数组、链表与哈希
+    weeks: 1
+    description: 线性结构与哈希表的取舍
+    items:
+      - title: 数组
+        resource_slug: cs-basics/array-linkedlist/array
+        est_minutes: 40
+        note: ""
+      - title: 链表
+        resource_slug: cs-basics/array-linkedlist/linked_list
+        est_minutes: 60
+        note: ""
+      - title: 哈希表
+        resource_slug: cs-basics/hashing/hash_map
+        est_minutes: 60
+        note: ""
+      - title: 哈希冲突
+        resource_slug: cs-basics/hashing/hash_collision
+        est_minutes: 40
+        note: ""
+  - title: 栈队列与树
+    weeks: 2
+    description: 受限线性结构、二叉树与遍历
+    items:
+      - title: 栈
+        resource_slug: cs-basics/stack-queue/stack
+        est_minutes: 45
+        note: ""
+      - title: 队列
+        resource_slug: cs-basics/stack-queue/queue
+        est_minutes: 45
+        note: ""
+      - title: 二叉树
+        resource_slug: cs-basics/tree/binary_tree
+        est_minutes: 60
+        note: ""
+      - title: 二叉树遍历
+        resource_slug: cs-basics/tree/binary_tree_traversal
+        est_minutes: 60
+        note: ""
+  - title: 排序与查找
+    weeks: 1
+    description: 常见排序算法与二分查找
+    items:
+      - title: 排序算法
+        resource_slug: cs-basics/sorting/sorting_algorithm
+        est_minutes: 60
+        note: ""
+      - title: 快速排序
+        resource_slug: cs-basics/sorting/quick_sort
+        est_minutes: 60
+        note: ""
+      - title: 归并排序
+        resource_slug: cs-basics/sorting/merge_sort
+        est_minutes: 60
+        note: ""
+      - title: 二分查找
+        resource_slug: cs-basics/searching/binary_search
+        est_minutes: 60
+        note: ""
+  - title: 分治、贪心与回溯
+    weeks: 2
+    description: 三类常用算法范式与经典问题
+    items:
+      - title: 分治算法
+        resource_slug: cs-basics/divide-conquer/divide_and_conquer
+        est_minutes: 60
+        note: ""
+      - title: 汉诺塔问题
+        resource_slug: cs-basics/divide-conquer/hanota_problem
+        est_minutes: 60
+        note: ""
+      - title: 贪心算法
+        resource_slug: cs-basics/greedy/greedy_algorithm
+        est_minutes: 60
+        note: ""
+      - title: 回溯算法
+        resource_slug: cs-basics/backtracking/backtracking_algorithm
+        est_minutes: 60
+        note: ""
+  - title: 动态规划
+    weeks: 1
+    description: 状态定义、转移方程与背包/编辑距离
+    items:
+      - title: 初探动态规划
+        resource_slug: cs-basics/dynamic-programming/intro_to_dynamic_programming
+        est_minutes: 70
+        note: ""
+      - title: 0-1 背包问题
+        resource_slug: cs-basics/dynamic-programming/knapsack_problem
+        est_minutes: 70
+        note: ""
+      - title: 动态规划解题思路
+        resource_slug: cs-basics/dynamic-programming/dp_solution_pipeline
+        est_minutes: 70
+        note: ""
+      - title: 编辑距离问题
+        resource_slug: cs-basics/dynamic-programming/edit_distance_problem
+        est_minutes: 70
+        note: ""

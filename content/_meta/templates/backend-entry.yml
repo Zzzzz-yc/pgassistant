@@ -1,0 +1,91 @@
+# 后端入门（6 周）：HTTP/API → 数据与存储 → 部署 → 计算机基础
+# 库内 backend / cs-basics 的真实资料占 15/16（93.8%），只有部署阶段留 1 条自定义任务
+title: 后端入门 6 周
+goal: 掌握 HTTP 与数据存储，能独立部署一个小型 API
+weeks: 6
+weekly_hours: 2
+label:
+  zh: 后端入门
+  en: Backend Entry
+summary: 从 HTTP 与 REST 起步，补 SQL 与缓存，最后用 Docker 和 Nginx 把 API 部署上线。
+stages:
+  - title: HTTP 与 API 设计
+    weeks: 2
+    description: 理解请求/响应、状态码与 REST 资源建模
+    items:
+      - title: HTTP 教程
+        resource_slug: backend/http/http-tutorial
+        est_minutes: 40
+        note: ""
+      - title: HTTP 概览：请求与响应
+        resource_slug: backend/http/http-overview
+        est_minutes: 40
+        note: ""
+      - title: HTTP 报文的结构
+        resource_slug: backend/http/http-messages
+        est_minutes: 40
+        note: ""
+      - title: HTTP 状态码速查
+        resource_slug: backend/http/http-status-codes
+        est_minutes: 40
+        note: ""
+      - title: RESTful 架构风格
+        resource_slug: backend/api-design/restful
+        est_minutes: 40
+        note: ""
+  - title: 数据与存储
+    weeks: 2
+    description: 关系型查询、SQLite 与缓存的基本用法
+    items:
+      - title: SQL 入门：从查询开始
+        resource_slug: backend/database/sql-intro
+        est_minutes: 40
+        note: ""
+      - title: SQL JOIN：多表查询
+        resource_slug: backend/database/sql-join
+        est_minutes: 40
+        note: ""
+      - title: SQLite 入门：单文件数据库
+        resource_slug: backend/database/sqlite-intro
+        est_minutes: 40
+        note: ""
+      - title: Redis 简介：内存数据库与缓存
+        resource_slug: backend/database/redis-intro
+        est_minutes: 40
+        note: ""
+  - title: 部署与运维
+    weeks: 1
+    description: 容器化与反向代理，把服务真正跑起来
+    items:
+      - title: Docker 入门：容器与镜像
+        resource_slug: backend/deployment/docker-intro
+        est_minutes: 60
+        note: ""
+      - title: Nginx 安装与配置
+        resource_slug: backend/deployment/nginx-intro
+        est_minutes: 50
+        note: ""
+      - title: 用 Docker Compose 部署一个 API
+        resource_slug: null
+        est_minutes: 90
+        note: 自定义任务
+  - title: 计算机基础
+    weeks: 1
+    description: 复杂度、哈希与基础数据结构，补齐排查问题的底层知识
+    items:
+      - title: 时间复杂度
+        resource_slug: cs-basics/complexity/time_complexity
+        est_minutes: 40
+        note: ""
+      - title: 哈希表
+        resource_slug: cs-basics/hashing/hash_map
+        est_minutes: 40
+        note: ""
+      - title: 基本数据类型
+        resource_slug: cs-basics/data-structure/basic_data_types
+        est_minutes: 40
+        note: ""
+      - title: 数组
+        resource_slug: cs-basics/array-linkedlist/array
+        est_minutes: 40
+        note: ""

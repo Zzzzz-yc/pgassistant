@@ -1,0 +1,95 @@
+# 前端入门（8 周）：HTML/CSS → JavaScript → 工程化 → React
+# 结构即 §7.6 的 plan_draft；label / summary 只用于模板列表展示（D10）
+title: 前端入门 8 周
+goal: 能独立完成一个中型 React 项目
+weeks: 8
+weekly_hours: 2
+label:
+  zh: 前端入门
+  en: Frontend Entry
+summary: 从零开始的前端路线：先把页面写出来，再补 JavaScript 与工程化，最后用 React 做完整项目。
+stages:
+  - title: HTML 与 CSS
+    weeks: 2
+    description: 建立页面结构与样式的基本功，能照着设计稿写出静态页
+    items:
+      - title: Web 入门：网站是怎么工作的
+        resource_slug: frontend/html-css/web-getting-started
+        est_minutes: 30
+        note: ""
+      - title: HTML 基础与常用标签
+        resource_slug: frontend/html-css/html-basics
+        est_minutes: 30
+        note: ""
+      - title: CSS 第一步：排版与颜色
+        resource_slug: frontend/html-css/css-first-steps
+        est_minutes: 30
+        note: ""
+      - title: Flexbox 弹性布局
+        resource_slug: frontend/html-css/css-flexbox
+        est_minutes: 30
+        note: ""
+  - title: JavaScript 基础
+    weeks: 2
+    description: 语法、DOM、闭包与异步，能独立写页面交互
+    items:
+      - title: JavaScript 第一步
+        resource_slug: frontend/javascript/js-first-steps
+        est_minutes: 40
+        note: ""
+      - title: JavaScript 语法基础
+        resource_slug: frontend/javascript/js-grammar
+        est_minutes: 40
+        note: ""
+      - title: DOM 操作与事件
+        resource_slug: frontend/javascript/js-dom
+        est_minutes: 30
+        note: ""
+      - title: ES6 入门：let / const 与解构
+        resource_slug: frontend/javascript/js-es6
+        est_minutes: 30
+        note: ""
+      - title: 闭包与作用域
+        resource_slug: frontend/javascript/js-closures
+        est_minutes: 30
+        note: ""
+  - title: 工程化与类型
+    weeks: 2
+    description: 版本控制、依赖管理与 TypeScript 日常类型
+    items:
+      - title: Git 入门：版本控制第一步
+        resource_slug: frontend/tooling/git-intro
+        est_minutes: 30
+        note: ""
+      - title: npm 与 package.json
+        resource_slug: frontend/tooling/npm-intro
+        est_minutes: 30
+        note: ""
+      - title: TypeScript 日常类型
+        resource_slug: frontend/typescript/ts-everyday-types
+        est_minutes: 40
+        note: ""
+      - title: 给项目配置 ESLint 与 Prettier
+        resource_slug: null
+        est_minutes: 60
+        note: 自定义任务
+  - title: React 实战
+    weeks: 2
+    description: 组件化、Hooks 与一次完整的上线
+    items:
+      - title: React 入门：组件与状态
+        resource_slug: frontend/react/react-learn
+        est_minutes: 40
+        note: ""
+      - title: React Hooks 参考
+        resource_slug: frontend/react/react-hooks
+        est_minutes: 40
+        note: ""
+      - title: 用 React 写一个待办清单
+        resource_slug: null
+        est_minutes: 120
+        note: 自定义任务
+      - title: 把静态站点部署到托管平台
+        resource_slug: null
+        est_minutes: 60
+        note: 自定义任务
