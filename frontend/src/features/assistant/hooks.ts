@@ -2,20 +2,23 @@
  * 助手模块数据层（Owner：助手模块 M4，docs/contracts/MODULES.md §3.3）。
  *
  * 导出两件事：
- * 1. `useAgentStream()` —— 契约要求的 `{send, abort, streaming, messages}`。**额外多一个
- *    `retry(assistantId)`**：重试必须复用原来的用户气泡（不能把同一句话再追加一遍），
- *    所以重试入口只能在 hook 内部（它知道"这条助手消息前面那条 user 消息是什么"）。
+ * 1. `useAgentStream()` —— 契约要求的 `{send, abort, streaming, messages}`。**额外多两个
+ *    方法**：`retry(assistantId)`（重试失败的回答，复用原来的用户气泡）与
+ *    `retryPlanSave(assistantId)`（C4：计划自动保存失败后重试）。
  *    其余四个键的形状与契约逐字一致，页面之外没有消费者。
  * 2. `useSaveDraft()` —— 草稿 → `POST /api/plans`（§3.9 的 `PlanCreate`）。
  *
- * 四条硬约束：
+ * 五条硬约束：
  * - **会话内不丢**：消息存在模块级 store（`features/assistant/thread.ts`），切路由回来
  *   还在；刷新 / 关标签页即清空。**令牌不进 sessionStorage，也不进这个 store**（§13.7）；
  * - **卸载即中止**：`useEffect` 的清理函数 `abort()`，避免切路由后上游还在烧 token（§7.9），
  *   同时把在飞的消息标成「已中止」，回来的页面不会留下永不结束的「正在输入」气泡；
  * - **`done` 后收敛**：`readSSE` 收到 `done` 就结束读流，这里把 `streaming` 置回 false；
  * - **`error` 优先**：`error` 帧之后不再有 `done`（§4.2 第 2 条），所以 `error` 一旦写入，
- *   该消息的 `text` 保持原样但不再被认为在流式（页面按 `error` 分支渲染错误卡片）。
+ *   该消息的 `text` 保持原样但不再被认为在流式（页面按 `error` 分支渲染错误卡片）；
+ * - **计划自动落库（C4）**：`done.kind=plan_draft` 后立刻 `POST /api/plans`，消息里只留
+ *   `PlanOutcome` 摘要；完整草稿由 `planSave.ts` 的进程内单例持有，失败时供「重试」使用。
+ *   同一消息 id 的成功保存只做一次（按 id 去重），防重渲染/重复 done 建两份计划。
  */
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
@@ -35,7 +38,8 @@ import {
   setThreadStreaming,
   subscribeThread,
 } from "./thread";
-import { type AssistantMessage } from "./types";
+import { planSaver } from "./planSave";
+import { planOutcomeFromDraft, type AssistantMessage } from "./types";
 
 /* ------------------------------------------------------------- 结果收窄 */
 
@@ -59,6 +63,11 @@ export function isPlanDraftResult(result: unknown): result is PlanDraft {
   );
 }
 
+/* ------------------------------------------------- 计划草稿缓存（内存） */
+
+// 完整草稿、去重集合与保存状态机都在 `planSave.ts` 的进程内单例里：
+// 草稿**不进消息对象**；消息只留 `PlanOutcome` 摘要（C4）。
+
 /* ---------------------------------------------------------------- 工具 */
 
 function isAbortError(error: unknown): boolean {
@@ -79,6 +88,7 @@ function emptyAssistant(id: string, createdAt: number): AssistantMessage {
     intent: null,
     kind: null,
     result: null,
+    plan: null,
     usage: null,
     error: null,
     streaming: true,
@@ -96,6 +106,7 @@ function userMessage(id: string, text: string, createdAt: number): AssistantMess
     intent: null,
     kind: null,
     result: null,
+    plan: null,
     usage: null,
     error: null,
     streaming: false,
@@ -112,6 +123,8 @@ export interface AgentStreamApi {
   send: (text: string) => void;
   /** 重发某条助手消息（不追加用户气泡）；`assistantId` 是失败/超时那条的 id。 */
   retry: (assistantId: string) => void;
+  /** 重试一条计划的自动保存（C4：保存失败时气泡里的按钮）。 */
+  retryPlanSave: (assistantId: string) => void;
   /** 中止当前流（用户点「中止」/ 组件卸载）。 */
   abort: () => void;
   streaming: boolean;
@@ -132,8 +145,14 @@ export function useAgentStream(): AgentStreamApi {
   );
   const { messages, streaming } = snapshot;
 
+  const saveMutation = useSaveDraft();
   const active = useRef<{ controller: AbortController; assistantId: string } | null>(null);
   const messagesRef = useRef<AssistantMessage[]>(messages);
+
+  // `POST /api/plans` 的实现注入给进程内单例（成功后的 query 失效仍由 useSaveDraft 做）
+  useEffect(() => {
+    planSaver.setSaveImpl((draft) => saveMutation.mutateAsync(draft));
+  }, [saveMutation]);
 
   // `retry` 需要读当前消息（找上一条 user 文本），用 ref 拿最新值而不是让 send 依赖 messages
   useEffect(() => {
@@ -177,16 +196,28 @@ export function useAgentStream(): AgentStreamApi {
             onIntent: (data) => patch(assistantId, (message) => ({ ...message, intent: data })),
             onDelta: (data) =>
               patch(assistantId, (message) => ({ ...message, text: message.text + data.text })),
-            onDone: (data) =>
+            onDone: (data) => {
+              // C4：计划只留摘要，完整草稿进内存缓存，并立刻自动保存到计划页。
+              const draft =
+                data.kind === "plan_draft" && isPlanDraftResult(data.result)
+                  ? data.result
+                  : null;
               patch(assistantId, (message) => ({
                 ...message,
                 streaming: false,
                 kind: data.kind,
-                result: data.result,
+                result:
+                  data.kind === "search" && isSearchResult(data.result) ? data.result : null,
+                plan: draft ? planOutcomeFromDraft(draft) : null,
                 usage: data.usage,
                 finishReason: data.finish_reason,
                 aborted: data.aborted,
-              })),
+              }));
+              if (draft) {
+                planSaver.remember(assistantId, draft);
+                void planSaver.save(assistantId);
+              }
+            },
             onError: (error) => {
               errorSeen = true;
               patch(assistantId, (message) => ({ ...message, streaming: false, error }));
@@ -248,6 +279,8 @@ export function useAgentStream(): AgentStreamApi {
       }
       if (!prompt) return;
 
+      // 这条消息要重新生成：旧草稿与"已保存"标记一并作废（新结果可以再存一次）
+      planSaver.forget(assistantId);
       setThreadMessages((prev) =>
         prev.map((message) =>
           message.id === assistantId
@@ -263,11 +296,15 @@ export function useAgentStream(): AgentStreamApi {
     [run],
   );
 
+  const retryPlanSave = useCallback((assistantId: string) => {
+    void planSaver.save(assistantId);
+  }, []);
+
   const abort = useCallback(() => {
     active.current?.controller.abort();
   }, []);
 
-  return { send, retry, abort, streaming, messages };
+  return { send, retry, retryPlanSave, abort, streaming, messages };
 }
 
 /* ------------------------------------------------------------ 保存草稿 */
@@ -275,7 +312,7 @@ export function useAgentStream(): AgentStreamApi {
 /**
  * 草稿 → 计划（`POST /api/plans`，§3.9）。
  *
- * `origin: "agent"`（草稿来自对话）、`set_active: true`（用户点了「保存为计划」就是要用它，
+ * `origin: "agent"`（草稿来自对话）、`set_active: true`（自动落库的语义就是"用它"，
  * 与 `/plans/new` 的保存行为一致）、`start_level` 草稿里没有，按 `beginner` 落库。
  * 成功后按 MODULES §3.3 的缓存规则写 `["plan", id]` 并让 `["plans"]` 失效。
  */

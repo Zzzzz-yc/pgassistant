@@ -28,6 +28,7 @@ import { DurationLabel } from "@/components/business/DurationLabel";
 import { TypeIcon } from "@/components/business/TypeIcon";
 import { Badge, Button, IconButton, cn } from "@/components/ui";
 import { useSaveDraft } from "@/features/assistant/hooks";
+import type { PlanOutcome } from "@/features/assistant/types";
 import { resourceHref } from "@/features/library/media";
 import { ApiError } from "@/lib/http";
 import type { Level, PlanDraft, SearchResponse } from "@/types/api";
@@ -359,6 +360,64 @@ export function PlanDraftCard({ draft }: { draft: PlanDraft }) {
           onRetry={() => save.mutate(draft)}
         />
       ) : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ 计划摘要 */
+
+/**
+ * 计划自动落库后的**一句话结论 + 跳转**（C4）。
+ *
+ * 助手气泡只渲染这个摘要；完整草稿留在 `hooks.ts` 的模块级缓存里（保存失败时重试）。
+ * 状态三选一：保存中 / 已保存（给 `/plans/{id}` 链接）/ 失败（给重试按钮）。
+ */
+export function PlanSummary({
+  plan,
+  onRetry,
+}: {
+  plan: PlanOutcome;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation("assistant");
+  const navigate = useNavigate();
+  const hours = Math.max(1, Math.round(plan.minutes / 60));
+  const saved = plan.saveState === "saved" && plan.planId !== null;
+  const failed = plan.saveState === "failed";
+  const params = { title: plan.title, stages: plan.stages, items: plan.items, hours };
+
+  return (
+    <div className="asst-plan asst-plan--summary">
+      <p className="asst-plan__title">
+        {saved
+          ? t("plan.summarySaved", params)
+          : failed
+            ? t("plan.summaryFailed", params)
+            : t("plan.summarySaving", params)}
+      </p>
+      <div className="asst-plan__actions">
+        {saved ? (
+          <Button
+            variant="primary"
+            iconRight={<ArrowRight size={14} aria-hidden="true" />}
+            onClick={() => navigate(`/plans/${plan.planId}`)}
+          >
+            {t("plan.open")}
+          </Button>
+        ) : failed ? (
+          <Button
+            variant="primary"
+            iconLeft={<ListChecks size={14} aria-hidden="true" />}
+            onClick={onRetry}
+          >
+            {t("plan.retrySave")}
+          </Button>
+        ) : (
+          <span className="asst-plan__note" role="status">
+            {t("plan.summaryWaiting")}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

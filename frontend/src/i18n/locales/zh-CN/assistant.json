@@ -101,7 +101,13 @@
     "saved": "已保存",
     "preview": "去预览编辑",
     "note": "保存会直接写库并设为进行中；想先改阶段/条目就点「去预览编辑」。",
-    "retry": "再保存一次"
+    "retry": "再保存一次",
+    "summarySaved": "已生成学习计划《{{title}}》（{{stages}} 阶段 / {{items}} 条 / 约 {{hours}} 小时），已保存到计划页",
+    "summarySaving": "已生成学习计划《{{title}}》（{{stages}} 阶段 / {{items}} 条 / 约 {{hours}} 小时），正在保存到计划页…",
+    "summaryFailed": "已生成学习计划《{{title}}》（{{stages}} 阶段 / {{items}} 条 / 约 {{hours}} 小时），保存失败，草稿还在，可以重试",
+    "summaryWaiting": "正在保存…",
+    "open": "去计划页",
+    "retrySave": "保存失败，重试"
   },
   "level": {
     "beginner": "入门",
