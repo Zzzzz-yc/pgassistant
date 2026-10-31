@@ -36,14 +36,19 @@ M0–M6 全部落地。
 
 ```bash
 # Windows 一键：建 .venv、装依赖、npm ci、npm run build、索引、起服务
-.\start.ps1
+.\start.cmd              # 推荐入口：用 -ExecutionPolicy Bypass 调 start.ps1，未签名也能跑
+.\start.ps1              # 执行策略已放行本地脚本时等价
 # 只起服务，不开浏览器
-.\start.ps1 -NoBrowser
+.\start.cmd -NoBrowser
 # 开发态：后端 + Vite 热更新（见下）
-.\start.ps1 -Dev
+.\start.cmd -Dev
 # macOS / Linux
 ./start.sh
 ```
+
+`start.ps1` 没有 Authenticode 签名。执行策略为 `AllSigned`（或脚本带“下载自互联网”标记）时，
+直接运行会报“未对文件 … 进行数字签名，无法在当前系统上运行该脚本”。`start.cmd` 只在启动这
+一个 PowerShell 进程时加 `-ExecutionPolicy Bypass`：不改系统设置、不装证书，参数原样透传。
 
 脚本会在 8000–8010 里挑一个空闲端口，把实际地址写进 `data/runtime.json` 并打开浏览器。
 选定端口会同时传给 uvicorn 和 `PG_PORT`：`core/config.py` 按它生成 Origin 白名单，
@@ -86,7 +91,7 @@ python -m uvicorn app.main:app --app-dir backend --port 8000
 ### 开发态（Vite 热更新）
 
 ```bash
-.\start.ps1 -Dev        # 后端（8000–8010 的空闲端口）+ Vite :5173，自动开 :5173
+.\start.cmd -Dev        # 后端（8000–8010 的空闲端口）+ Vite :5173，自动开 :5173
 ```
 
 `-Dev` 会设 `PG_DEV_ORIGINS=http://127.0.0.1:5173`，并让 Vite 把 **`/api` 与 `/media`** 都代理到后端：

@@ -3,6 +3,9 @@
 # 满屏 diff 噪音，并让 body_md 里混进 \r（HANDOFF §3 第 5 条）。
 * text=auto eol=lf
 
+# Windows 批处理必须是 CRLF，否则 cmd.exe 解析多行 if 块会出岔子
+*.cmd text eol=crlf
+
 # 二进制：不要做换行转换，也不要尝试文本 diff
 *.png binary
 *.jpg binary
