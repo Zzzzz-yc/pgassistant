@@ -5,7 +5,8 @@
 - 404（`base_url` 缺 `/v1` 的典型症状）与纯文本 / HTML 响应体；
 - 401 / 403 密钥类；429 退避语义与错误码不变；5xx 语义不变；
 - 响应体超长截断（message ≤300 字原因、detail.body ≤500 字符）；
-- `probe()` 失败也返回可读 message + 按状态码 hint，且探针 `max_tokens` 足够推理型模型。
+- `probe()` 失败也返回可读 message + 按状态码 hint，且探针 `max_tokens` 足够推理型模型；
+- 探针 message 恒 ≤ `SettingsTestResponse.message` 的 300 字符上限（长上游错误体不再 500）。
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ import json
 import httpx
 import pytest
 
+from app.schemas.models import SettingsTestResponse
 from app.services import llm_client
 from app.services.llm_client import LLMClient, LLMConfig
 
@@ -251,6 +253,63 @@ def test_probe_returns_readable_reason_and_hint_on_400():
     assert "Model Not Exist" in result.message
     assert "模型名" in result.message                     # settings/test 没有 hint 字段
     assert "sk-test-0000" not in result.message           # 不回显密钥
+
+
+@pytest.mark.parametrize("reason_len", [231, 450, 600])
+def test_probe_message_stays_within_300_chars(reason_len):
+    """长上游错误体也必须让 `SettingsTestResponse` 构造成功（探针仍 200，不是 500）。"""
+    upstream_reason = "upstream model error " + "y" * reason_len
+    mock = httpx.MockTransport(lambda request: httpx.Response(
+        400, json={"error": {"message": upstream_reason, "type": "invalid_request_error"}}
+    ))
+    client = LLMClient(CONFIG, client=httpx.AsyncClient(transport=mock))
+
+    result = run_probe(client)
+
+    assert result.ok is False
+    assert result.error_code == "LLM_BAD_OUTPUT"
+    assert len(result.message) <= llm_client.PROBE_MESSAGE_LIMIT == 300
+    # 状态码与上游原因开头必须保留（hint 可以让位）
+    assert "HTTP 400" in result.message
+    assert "upstream model error" in result.message
+    # 契约上限：直接用它构造响应模型，不得抛 ValidationError
+    payload = SettingsTestResponse(kind="llm", **result.__dict__)
+    assert payload.message == result.message
+    if reason_len >= 450:
+        assert result.message.endswith("…")
+
+
+def test_probe_401_with_non_sk_key_shape_is_redacted():
+    """用户密钥不是 `sk-` 形状时，上游回显也必须按实际 key 精确替换。"""
+    echoed = "abc123def4567890"
+    config = LLMConfig(
+        base_url=CONFIG.base_url, api_key=echoed,
+        model=CONFIG.model, temperature=CONFIG.temperature,
+        max_tokens=CONFIG.max_tokens,
+    )
+    mock = httpx.MockTransport(lambda request: httpx.Response(
+        401,
+        json={"error": {"message": "Incorrect API key provided: " + echoed,
+                        "type": "authentication_error"}},
+    ))
+    client = LLMClient(config, client=httpx.AsyncClient(transport=mock))
+
+    with pytest.raises(llm_client.LLMUnauthorized) as info:
+        run_chat(client)
+
+    exc = info.value
+    assert echoed not in exc.message
+    assert echoed not in json.dumps(exc.detail, ensure_ascii=False)
+    assert "sk-****" in exc.message
+
+    probe = run_probe(LLMClient(config, client=httpx.AsyncClient(transport=httpx.MockTransport(
+        lambda request: httpx.Response(
+            401, json={"error": {"message": "bad key: " + echoed}}
+        )
+    ))))
+    assert probe.ok is False
+    assert echoed not in probe.message
+    assert "sk-****" in probe.message
 
 
 def test_probe_401_reports_key_hint():

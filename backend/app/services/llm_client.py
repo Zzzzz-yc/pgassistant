@@ -55,9 +55,15 @@ DEFAULT_TIMEOUT = 60.0
 #: 非 2xx 时保留的上游响应体上限（字符）。只进 `message` / `detail`，**不进日志**。
 UPSTREAM_BODY_LIMIT = 500
 #: 探针的 token 预算。推理型模型会先把预算花在 `reasoning_content` 上：
-#: 实测 `deepseek-flash` 在 max_tokens=8/32 时正文为空（finish_reason=length），
-#: 64 起才有正文；128 留出稳定余量。探针只发 1 条 "ping"，成本可忽略。
+#: 对 `deepseek-flash` 的实测（2026-10-31，真实 API 复现）：max_tokens=8 与 64
+#: 时 HTTP 200 但 `choices[0].message.content` 为空、finish_reason=length；
+#: max_tokens=128 时返回正文（completion_tokens=68）。探针只发 1 条 "ping"，
+#: 128 tokens 的成本可忽略。回归用例见
+#: `backend/tests/test_llm_probe.py::test_probe_reports_empty_content_from_reasoning_model`。
 PROBE_MAX_TOKENS = 128
+#: `SettingsTestResponse.message` 的硬上限（schemas/models.py：`max_length=300`）。
+#: 探针失败必须仍是 200，message 超限会变成 pydantic `ValidationError` → 500。
+PROBE_MESSAGE_LIMIT = 300
 
 #: 按状态码给的可操作 hint（覆盖 `LLM_MESSAGES` 里按错误码的默认文案）。
 #: 错误码与异常类型不变（MODULES §4.3 / API.md §5），这里只补可读性。
@@ -361,23 +367,32 @@ def _retry_after(response: httpx.Response, fallback: float) -> float:
 
 
 #: 上游偶尔会在错误体里回显密钥；进 message/detail 前统一脱敏（§13.1）。
+#: 先按本次请求的 `api_key` 精确替换（任意形状），再用 `sk-` 形状兜底。
 _SECRET_PATTERN = re.compile(r"sk-[A-Za-z0-9_\-]{6,}")
 
 
-def _redact_secrets(text: str) -> str:
-    return _SECRET_PATTERN.sub("sk-****", text or "")
+def _redact_secrets(text: str, secret: str = "") -> str:
+    """把本次请求实际使用的密钥（任意形状）与 `sk-` 形状密钥替换成 `sk-****`。"""
+    cleaned = text or ""
+    if secret:
+        cleaned = cleaned.replace(secret, "sk-****")
+    return _SECRET_PATTERN.sub("sk-****", cleaned)
 
 
-async def _read_error_body(response: httpx.Response,
-                           limit: int = UPSTREAM_BODY_LIMIT) -> str:
-    """读非 2xx 的响应体并截断到 `limit` 字符。读失败不能吞掉原错误码。"""
+async def _read_error_body(response: httpx.Response, *,
+                           limit: int = UPSTREAM_BODY_LIMIT,
+                           secret: str = "") -> str:
+    """读非 2xx 的响应体并截断到 `limit` 字符。读失败不能吞掉原错误码。
+
+    `secret` 只用于就地替换，不写日志、不单独保留。
+    """
     try:
         raw = await response.aread()
     except Exception:                       # 上游半途断开 / 连接已被重置
         return ""
     if not raw:
         return ""
-    text = _redact_secrets(raw.decode("utf-8", "replace"))
+    text = _redact_secrets(raw.decode("utf-8", "replace"), secret)
     if len(text) <= limit:
         return text
     return text[:limit] + "…"
@@ -443,13 +458,33 @@ def _error_detail(status: int, body: str, reason: dict[str, str]) -> dict[str, A
     return detail
 
 
+def _truncate(text: str, limit: int) -> str:
+    """截断到 `limit` 字符（含省略号）；`limit<=0` 返回空串。"""
+    if limit <= 0:
+        return ""
+    if len(text) <= limit:
+        return text
+    if limit == 1:
+        return "…"
+    return text[:limit - 1] + "…"
+
+
 def _probe_message(exc: LLMError) -> str:
     """`POST /api/settings/test` 只回 `message` + `error_code`（无 hint 字段），
-    所以把按状态码的可操作提示拼进探针文案。"""
+    所以把按状态码的可操作提示拼进探针文案。
+
+    硬约束：结果必须 ≤ `PROBE_MESSAGE_LIMIT`（`SettingsTestResponse.message`
+    `max_length=300`）。`exc.message` 以「基础文案（HTTP <状态码>）：<上游原因>」开头，
+    整体截断只砍尾部，所以状态码与上游原因开头都保留；hint 先按剩余空间截断。
+    """
+    message = _truncate(exc.message, PROBE_MESSAGE_LIMIT)
     hint = exc.hint
-    if hint and hint not in exc.message:
-        return "%s（%s）" % (exc.message, hint)
-    return exc.message
+    if not hint or hint in message:
+        return message
+    room = PROBE_MESSAGE_LIMIT - len(message) - 2      # 两个全角括号
+    if room <= 0:
+        return message
+    return message + "（" + _truncate(hint, room) + "）"
 
 
 def strip_fences(text: str) -> str:
@@ -536,7 +571,7 @@ class LLMClient:
                 wait = _retry_after(response, RATE_LIMIT_BACKOFF[
                     min(rate_limited, len(RATE_LIMIT_BACKOFF) - 1)
                 ])
-                body = await _read_error_body(response)
+                body = await _read_error_body(response, secret=config.api_key)
                 await response.aclose()
                 if rate_limited < RATE_LIMIT_RETRIES:
                     rate_limited += 1
@@ -555,7 +590,8 @@ class LLMClient:
             if 200 <= status < 300:
                 return response
             # 非 2xx：先读上游响应体再关连接（否则 body 丢失，只剩状态码）。
-            body = await _read_error_body(response)
+            # 用本次请求实际使用的 api_key 精确脱敏（任意形状），再走 sk- 兜底。
+            body = await _read_error_body(response, secret=config.api_key)
             await response.aclose()
             reason = _upstream_reason(body)
             detail = _error_detail(status, body, reason)
