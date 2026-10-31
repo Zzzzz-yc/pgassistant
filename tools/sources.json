@@ -1,9 +1,9 @@
 {
   "version": 1,
   "rules": {
-    "only_summary": "只取标题 + 摘要 + 前 5 段要点 + 速查表 + 原文链接",
-    "max_body_chars": 3000,
-    "fetch_interval_sec": 0.4
+    "only_summary": false,
+    "max_body_chars": 40000,
+    "fetch_interval_sec": 1.0
   },
   "batches": {
     "base": [
