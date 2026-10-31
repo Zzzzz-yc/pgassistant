@@ -1,7 +1,7 @@
 # 贡献指南
 
-> 先读 [需求文档.md](需求文档.md) 的 §3（技术栈）/ §4（内容包）/ §12.2（测试）；契约细节在
-> [docs/contracts/](docs/contracts/)，冲突以 `DECISIONS.md` 的裁定为准。
+> 先读 [README.md](README.md) 了解产品与启动方式。内部规格与接口契约不随仓库分发，
+> 需要时请在项目维护者处获取。
 
 ## 1. 本地启动
 
@@ -68,7 +68,7 @@ python -m pytest -q --basetemp=data/.pytest-tmp   # 该路径已在 .gitignore
 ├─ frontend/                                   # React + Vite（dist/、node_modules/ 不入库）
 ├─ content/                                    # 内容库：_meta/ 手写元数据随仓库，正文本地生成
 ├─ tools/                                      # 内容准备与转换脚本
-├─ docs/contracts/                             # 接口、数据库、模块契约
+├─ docs/                                       # 内容来源许可、可选启动器说明
 └─ data/                                       # 运行时数据（不入库）
 ```
 
@@ -81,9 +81,8 @@ python -m pytest -q --basetemp=data/.pytest-tmp   # 该路径已在 .gitignore
   `python tools/prepare_content.py --force`（见 [tools/README.md](tools/README.md)）。
 - `content/_meta/` 是手写元数据（分类名、计划模板、分词词典），随仓库维护，可以直接改。
 - front-matter 必填 `slug / title / summary / stack / category / level / type / author / license`，
-  格式见需求文档 §4.2；`slug` 由路径派生，**改目录等于改主键**，已有计划会错位。
-- 单条资料的准入标准见需求文档 §4.5（学习目标 / 前置知识 / 正文 / 来源 / 学时 / 元数据 / 时效），
-  逐条自查后再提 PR。
+  `slug` 由路径派生，**改目录等于改主键**，已有计划会错位。
+- 单条资料要有学习目标、前置知识、正文、来源、学时与元数据，逐条自查后再提 PR。
 - 新分类先加 `content/_meta/taxonomy.yml`，且**只登记有内容的分类**（空分类会让筛选器出现死选项）。
 - 媒体：WebP、长边 ≤1600px、单文件 ≤300KB、仓库总量 ≤50MB；**视频不落仓库**，只存 url。
 - 改完跑 `validate_content.py`；改了内容再重跑 `bootstrap_index.py`。
@@ -93,7 +92,7 @@ python -m pytest -q --basetemp=data/.pytest-tmp   # 该路径已在 .gitignore
 - [ ] `python backend/scripts/validate_content.py` 退出码 0
 - [ ] `python -m pytest -q` 全绿
 - [ ] 改了前端：`npm run build --prefix frontend` 通过（`build` 内含 `tsc --noEmit`）
-- [ ] 改了契约（`docs/contracts/**`）：先在 `DECISIONS.md` 增补编号，再改代码
+- [ ] 改了内容结构（分类、模板、分词词典）：同步 `content/_meta/` 下的文件
 - [ ] 没有 `data/`、`*.db`、`.env`、`.venv/`、`.deps/`、`handoff/`
 - [ ] 没有 `jieba.cache`、`pytest-of-*`、`dist/`、`node_modules/`、截图等本地产物
 - [ ] 没有把本机绝对路径（`C:/Users/...`）写进代码或文档
