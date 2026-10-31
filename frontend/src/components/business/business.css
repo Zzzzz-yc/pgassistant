@@ -7,6 +7,7 @@
 /* ========================================================== ResourceCard */
 
 .rc {
+  /* 整卡热区的包含块：标题链接的 ::after 以它为参照铺满整张卡 */
   position: relative;
   overflow: hidden;
   height: 100%;
@@ -50,6 +51,8 @@
   position: absolute;
   top: var(--space-2);
   right: var(--space-2);
+  /* 拉伸层是 z-index:0 的绝对定位块，按钮必须浮到它上面才点得到 */
+  z-index: 1;
   opacity: 0;
   transform: translateY(-2px);
   transition: opacity var(--transition-fast) var(--transition-easing),
@@ -80,16 +83,21 @@
 }
 
 .rc__title {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
   font-family: var(--font-title);
   font-size: var(--font-size-title-sm);
   font-weight: var(--weight-title);
   letter-spacing: var(--letter-spacing-title);
   line-height: var(--line-height-tight);
   color: var(--text);
+}
+
+/* 两行截断放在内层 span 上：`.rc__title` 不能再 `overflow: hidden`，
+ * 否则会把标题链接的拉伸层（::after）裁在标题框里，整卡热区就铺不出去。 */
+.rc__title-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .rc__title-link {
@@ -102,7 +110,48 @@
   text-decoration: none;
 }
 
-.rc__title-link:focus-visible {
+/* 拉伸链接（stretched link）：热区铺满整张卡，但 DOM 里始终只有标题这一个
+ * 语义链接，Tab 顺序与屏幕阅读器读到的链接名都不变。 */
+.rc__title-link--stretched::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* 卡内其它可交互元素抬到拉伸层之上，否则整卡链接会把点击全吃掉：
+ * - `.rc__add` 本身是 absolute，只需补 z-index；
+ * - 卡内任何 button / 非标题链接（标签按钮等）补定位 + z-index。 */
+.rc button,
+.rc a:not(.rc__title-link--stretched) {
+  position: relative;
+  z-index: 1;
+}
+
+/* 键盘聚焦标题链接时，焦点环包住整张卡，而不只是那一行标题。
+ * 不用 :focus-within：鼠标点「加入计划」不该给整卡留下焦点环。 */
+.rc:has(.rc__title-link--stretched:focus-visible) {
+  outline: var(--focus-ring-width) solid var(--primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* 不支持 :has 的浏览器退回标题链接自身的 2px 环；支持 :has 时整卡环已经画在
+ * `.rc` 上，这里收掉全局 `:focus-visible` 给链接的第二圈，避免套两层。 */
+@supports selector(:has(*)) {
+  .rc__title-link--stretched:focus-visible {
+    outline: none;
+  }
+}
+
+@supports not selector(:has(*)) {
+  .rc__title-link--stretched:focus-visible {
+    outline: var(--focus-ring-width) solid var(--primary);
+    outline-offset: var(--focus-ring-offset);
+    border-radius: var(--radius-control);
+  }
+}
+
+.rc__title-link:not(.rc__title-link--stretched):focus-visible {
   outline: var(--focus-ring-width) solid var(--primary);
   outline-offset: var(--focus-ring-offset);
   border-radius: var(--radius-control);
