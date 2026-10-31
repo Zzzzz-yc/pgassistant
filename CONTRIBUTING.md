@@ -23,6 +23,7 @@ python -m venv .venv
 .venv\Scripts\activate                  # macOS / Linux: source .venv/bin/activate
 python -m pip install -r backend/requirements.txt
 
+python tools/prepare_content.py                  # 首次：准备内容库（需要联网；已有内容会跳过）
 python backend/scripts/bootstrap_index.py        # 建库 + 索引（首次约 2 秒）
 python -m uvicorn app.main:app --app-dir backend --port 8000
 ```
@@ -55,8 +56,9 @@ python -m pytest -q --basetemp=data/.pytest-tmp   # 该路径已在 .gitignore
 
 ## 3. 内容维护
 
-- **不要手改 `content/`**：改 `tools/sources.json` 或对应转换脚本后重跑，保证可复现
-  （见 [tools/README.md](tools/README.md)）。
+- **`content/` 的正文由 `tools/prepare_content.py` 生成，不要手改**：重建用
+  `python tools/prepare_content.py --force`（见 [tools/README.md](tools/README.md)）。
+- `content/_meta/` 是手写元数据（分类名、计划模板、分词词典），随仓库维护，可以直接改。
 - front-matter 必填 `slug / title / summary / stack / category / level / type / author / license`，
   格式见需求文档 §4.2；`slug` 由路径派生，**改目录等于改主键**，已有计划会错位。
 - 单条资料的准入标准见需求文档 §4.5（学习目标 / 前置知识 / 正文 / 来源 / 学时 / 元数据 / 时效），

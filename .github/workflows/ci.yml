@@ -38,8 +38,14 @@ jobs:
       - name: 安装后端依赖
         run: python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 
-      - name: 内容校验（0 错误才算过）
-        run: python backend/scripts/validate_content.py
+      # content/ 的正文不入库，新检出默认没有内容；有内容时才跑校验。
+      - name: 内容校验（content/ 不存在则跳过）
+        run: |
+          if [ ! -d content ] || [ -z "$(find content -name '*.md' -not -path 'content/_meta/*' -print -quit)" ]; then
+            echo "content/ 无生成内容，跳过内容校验"
+          else
+            python backend/scripts/validate_content.py
+          fi
 
       # pytest.ini 在仓库根：testpaths=backend/tests，conftest.py 会把 backend/ 加进 sys.path，
       # 所以从仓库根直接跑即可，不需要额外的 PYTHONPATH 或工作目录切换。

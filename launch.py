@@ -55,6 +55,7 @@ BACKEND = ROOT / "backend"
 VENV = ROOT / ".venv"
 DEFAULT_RUNTIME = ROOT / "data" / "runtime.json"
 BOOTSTRAP = BACKEND / "scripts" / "bootstrap_index.py"
+PREPARE_CONTENT = ROOT / "tools" / "prepare_content.py"
 PORT_START = 8000
 PORT_END = 8010
 VITE_PORT = 5173
@@ -113,6 +114,22 @@ def tail(cp: subprocess.CompletedProcess, lines: int = 8) -> str:
     if not text:
         return ""
     return "\n".join(text.splitlines()[-lines:])
+
+
+def content_body_count() -> int:
+    """content/ 下由脚本生成的正文篇数（不含 _meta 与 CREDITS）。"""
+    content = ROOT / "content"
+    if not content.is_dir():
+        return 0
+    count = 0
+    for path in content.rglob("*.md"):
+        parts = path.relative_to(content).parts
+        if parts and parts[0] == "_meta":
+            continue
+        if path.name.lower().startswith("credits"):
+            continue
+        count += 1
+    return count
 
 
 # --------------------------------------------------------------------------
@@ -648,7 +665,30 @@ def cmd_start(opts: Options) -> int:
                 fatal("构建结束但 frontend/dist/index.html 仍不存在。")
             ok("前端构建完成")
 
-    # -------------------------------------------------------------------- 4. 索引
+    # ------------------------------------------------------------------ 4. 内容库
+    content_count = content_body_count()
+    if content_count:
+        ok(f"内容库已存在（{content_count} 篇），跳过准备")
+    else:
+        step("首次运行：准备内容库（需要联网）")
+        if dry:
+            info(f"将执行：{py} {rel(PREPARE_CONTENT)}")
+        else:
+            cp = run([py, PREPARE_CONTENT], cwd=ROOT)
+            content_count = content_body_count()
+            if cp.returncode == 0 and content_count:
+                ok(f"内容库就绪（{content_count} 篇）")
+            else:
+                extra = tail(cp, 2).replace("\n", " / ")
+                if extra:
+                    info("准备输出：" + extra)
+                if content_count:
+                    warn(f"内容库仅部分就绪（{content_count} 篇）；可稍后运行 "
+                         "python tools/prepare_content.py 重试")
+                else:
+                    warn("内容库为空，资料库页面将是空的；可稍后运行 python tools/prepare_content.py 重试")
+
+    # -------------------------------------------------------------------- 5. 索引
     step("准备数据库与索引（幂等，内容没变会跳过）")
     if dry:
         info(f"将执行：{py} {rel(BOOTSTRAP)}")
