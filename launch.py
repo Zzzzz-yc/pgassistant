@@ -65,6 +65,7 @@ VENV = ROOT / ".venv"
 DEFAULT_RUNTIME = ROOT / "data" / "runtime.json"
 BOOTSTRAP = BACKEND / "scripts" / "bootstrap_index.py"
 PREPARE_CONTENT = ROOT / "tools" / "prepare_content.py"
+CONTENT_STATUS = ROOT / "data" / ".sources" / "content-status.json"
 PORT_START = 8000
 PORT_END = 8010
 VITE_PORT = 5173
@@ -139,6 +140,40 @@ def content_body_count() -> int:
             continue
         count += 1
     return count
+
+
+STACK_LABELS = {"cs-basics": "算法", "interview": "面试", "frontend": "前端", "backend": "后端"}
+
+
+def read_content_status():
+    """读 tools/prepare_content.py 写下的内容完整性状态；没有或损坏就返回 None。"""
+    try:
+        payload = json.loads(CONTENT_STATUS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def warn_if_missing_content() -> None:
+    """缺少大类时打印醒目警告；只提示，不阻断启动。"""
+    status = read_content_status()
+    if not status:
+        return
+    missing = [str(name) for name in (status.get("missing") or []) if str(name).strip()]
+    if not missing:
+        return
+    total = status.get("total_articles")
+    if not isinstance(total, int):
+        total = content_body_count()
+    names = "、".join(f"{STACK_LABELS.get(name, name)}（{name}）" for name in missing)
+    bar = "!" * 68
+    print("", flush=True)
+    print(bar, flush=True)
+    print(f"  警告：资料库内容不完整，缺少 {names}", flush=True)
+    print(f"  当前内容库共 {total} 篇；服务仍会启动，但上述大类的资料页会是空的。", flush=True)
+    print("  修复：配置 GitHub 镜像（PG_GIT_MIRROR，例如 https://ghfast.top/https://github.com）", flush=True)
+    print("        或给 git 配置代理后，重跑：python tools/prepare_content.py --force", flush=True)
+    print(bar, flush=True)
 
 
 # --------------------------------------------------------------------------
@@ -696,6 +731,9 @@ def cmd_start(opts: Options) -> int:
                          "python tools/prepare_content.py 重试")
                 else:
                     warn("内容库为空，资料库页面将是空的；可稍后运行 python tools/prepare_content.py 重试")
+
+    # 内容完整性：缺大类时给醒目警告（不阻断启动，服务照常起来）
+    warn_if_missing_content()
 
     # -------------------------------------------------------------------- 5. 索引
     step("准备数据库与索引（幂等，内容没变会跳过）")
