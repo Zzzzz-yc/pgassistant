@@ -229,15 +229,24 @@ def test_out_of_scope_and_greeting_make_no_llm_call(client, token, mock):
 
 
 def test_complete_search_slots_do_not_escalate(client, token, mock):
-    """「冲击前端岗位 + 找资料」抽到 stack=frontend → 不升级、零调用。"""
+    """「冲击前端岗位 + 找资料」抽到 stack=frontend → 不升级。
+
+    种子库里没有 frontend 资料，检索会走第三层的「零结果 → 重写」——那是检索执行器
+    的兜底（每请求最多一次），**不是** L1.5 升级：intent 帧仍是 `source="rule"`、
+    confidence 0.6，没有分类调用。
+    """
     resp = post_chat(client, token, COMPLETE_SEARCH)
     assert resp.status_code == 200
     frames = parse_sse(resp.text)
     assert [name for name, _ in frames] == ["intent", "done"]
     assert frames[0][1]["intent"] == "RESOURCE_SEARCH"
+    assert frames[0][1]["source"] == "rule"           # 未经 L2 分类
     assert frames[0][1]["confidence"] == 0.6          # 弱命中，但槽位够用
     assert "error" not in [name for name, _ in frames]
-    assert mock.calls == 0
+    assert mock.calls == 1
+    # 唯一一次模型调用是检索重写（system 提示词可认），不是 classify。
+    body = json.loads(mock.requests[0].content)
+    assert "检索词重写器" in body["messages"][0]["content"]
 
 
 # --------------------------------------------------------------- 端到端：升级

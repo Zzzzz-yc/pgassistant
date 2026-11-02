@@ -1,9 +1,10 @@
 """提示词（M4）。提示词与代码分文件，便于版本比对与 review。
 
-四份（契约 `MODULES.md` §1.1 `backend/app/prompts/**`）：
+五份（契约 `MODULES.md` §1.1 `backend/app/prompts/**`）：
 
 - `classify.md`：L2 意图分类（§7.5 的严格 JSON 契约）
 - `slots.md`：L2 槽位补抽（规则抽不全时补 `stack` / `level` / `topic` 等，本轮新增）
+- `search_rewrite.md`：检索零结果后的查询重写（第三层检索机会，本轮新增）
 - `plan.md`：两段式的第二段（候选集注入、只许用候选 slug、§7.6）
 - `advice.md`：学习建议（必须引用站内资料 + 免责声明，§7.3）
 

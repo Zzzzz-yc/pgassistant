@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -251,4 +252,95 @@ async def extract_slots_llm(text: str, llm: LLMClient, *,
         return _to_slot_result(_parse_slots(reply))
     except (LLMError, ValueError) as exc:
         log.info("event=router.slots fallback=rule reason=%s", type(exc).__name__)
+        return None
+
+
+# --------------------------------------------------------------- 检索重写
+#: 重写结果 `query` / `topic` 的硬上限（与提示词里的「≤30 字」一致）。
+#: 模型偶尔会无视长度约束：截断而不是整句丢弃，最多浪费一次已经花掉的调用，不影响正确性。
+REWRITE_QUERY_LIMIT = 30
+
+
+@dataclass(frozen=True)
+class SearchRewrite:
+    """一次查询重写的结果（**不是** API 契约模型，只给 `RESOURCE_SEARCH` 执行器用）。"""
+
+    query: str                  # 第二次检索用的查询词（非空）
+    stack: str | None = None    # 站内栈名之一，或 None（只信任 STACKS 里的值）
+    topic: str | None = None    # 模型给出的主题词（可空，仅用于可观测性）
+
+
+class _RewritePayload(BaseModel):
+    """查询重写的输出校验模型（兜住脏数据；多余字段丢弃）。"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    query: str | None = None
+    stack: str | None = None
+    topic: str | None = None
+    reason: str | None = None
+
+
+def _parse_rewrite(text: str) -> _RewritePayload:
+    """剥围栏 → `json.loads` → Pydantic。任何一步失败都抛 `ValueError`。"""
+    body = strip_fences(text)
+    if not body:
+        raise ValueError("空输出")
+    try:
+        data = json.loads(body)
+    except ValueError as exc:
+        raise ValueError("不是合法 JSON: %s" % exc) from exc
+    if not isinstance(data, dict):
+        raise ValueError("顶层必须是 JSON 对象")
+    try:
+        return _RewritePayload.model_validate(data)
+    except ValidationError as exc:
+        raise ValueError(_short_errors(exc)) from exc
+
+
+def _to_rewrite(payload: _RewritePayload) -> SearchRewrite | None:
+    """收敛成 `SearchRewrite`；`query` 拿不到可用值就返回 `None`（放弃重试）。
+
+    `stack` 只接受 `STACKS` 里的值：模型编一个不存在的栈名会让 SQL 过滤恒为空，
+    等于把第二次机会也浪费掉（与 `_to_slot_result` 同口径）。
+    """
+    topic = (payload.topic or "").strip()[:REWRITE_QUERY_LIMIT] or None
+    query = (payload.query or "").strip()[:REWRITE_QUERY_LIMIT] or topic
+    if not query:
+        return None
+    stack = (payload.stack or "").strip().lower()
+    return SearchRewrite(
+        query=query,
+        stack=stack if stack in STACKS else None,
+        topic=topic,
+    )
+
+
+async def rewrite_search_query(text: str, llm: LLMClient, *, locale: str = "zh-CN",
+                               first_query: str = "",
+                               stack: str | None = None) -> SearchRewrite | None:
+    """零结果后的查询重写：**一次调用、不重试**，失败一律返回 `None`。
+
+    - 走与 `classify()` / `extract_slots_llm()` 相同的 `_ask`（`json_object` 优先，
+      上游不支持时自动降级为纯提示词），不另写客户端；
+    - 非 JSON / 字段类型不对 / 超时 / 限流 / 401 **全部吞掉并返回 `None`**：
+      这是"检索的第三次机会"，不是用户请求的主路径，绝不能让空结果变成 500 或 error 帧。
+    """
+    body = normalize(text)
+    if not body:
+        return None
+    messages = [
+        {"role": "system", "content": load_prompt("search_rewrite")},
+        {"role": "user", "content": (
+            "USER_TEXT:\n" + body
+            + "\n\nFIRST_QUERY:\n" + (first_query or "")
+            + "\n\nSTACK: " + (stack or "null")
+            + "\n\nLOCALE: " + (locale or "zh-CN")
+        )},
+    ]
+    try:
+        reply = await _ask(llm, messages)
+        return _to_rewrite(_parse_rewrite(reply))
+    except (LLMError, ValueError) as exc:
+        log.info("event=router.rewrite fallback=none reason=%s", type(exc).__name__)
         return None
