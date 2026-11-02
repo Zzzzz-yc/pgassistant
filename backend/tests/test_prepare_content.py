@@ -117,6 +117,21 @@ def test_status_flags_missing_cs_basics(prepare, tmp_path, monkeypatch):
     assert not (tmp_path / "content-status.json.tmp").exists()
 
 
+def test_media_total_bytes_counts_media_only(prepare, tmp_path):
+    (tmp_path / "a.png").write_bytes(b"x" * 10)
+    (tmp_path / "b.webp").write_bytes(b"x" * 5)
+    (tmp_path / "c.md").write_text("---\nstack: cs-basics\n---\n", encoding="utf-8")
+    assert prepare.media_total_bytes(tmp_path) == 15
+
+
+def test_status_always_has_media_entry(prepare, monkeypatch):
+    monkeypatch.setattr(prepare, "body_markdown_count", lambda *args, **kwargs: 0)
+    explicit = prepare.build_content_status(
+        {}, {}, {"status": "skipped", "detail": "未安装 Pillow"})
+    assert explicit["media"] == {"status": "skipped", "detail": "未安装 Pillow"}
+    assert prepare.build_content_status({}, {})["media"]["status"] == "skipped"
+
+
 # --------------------------------------------------------------------------
 # 启动提示
 # --------------------------------------------------------------------------

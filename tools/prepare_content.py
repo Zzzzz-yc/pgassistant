@@ -16,6 +16,7 @@
 2. ``convert_content.py`` 转换 hello-algo 章节
 3. ``split_jwasham.py`` 拆分 jwasham 清单
 4. ``fetch_intro.py`` 按 ``tools/sources.json`` 抓取外站教程正文
+5. ``optimize_media.py`` 把超过 300KB 的图片转 WebP（需要 Pillow；未安装时只提示并跳过）
 
 源地址可用环境变量覆盖（只读 ``PG_*`` 环境变量，不读 ``.env`` 文件）：
 
@@ -247,7 +248,7 @@ def stack_counts(content: Path = CONTENT) -> dict:
     return counts
 
 
-def build_content_status(counts: dict, sources: dict) -> dict:
+def build_content_status(counts: dict, sources: dict, media: dict | None = None) -> dict:
     stacks = {}
     for name in EXPECTED_STACKS:
         stacks[name] = counts.get(name, 0)
@@ -260,6 +261,7 @@ def build_content_status(counts: dict, sources: dict) -> dict:
         "total_articles": body_markdown_count(),
         "stacks": stacks,
         "sources": sources,
+        "media": media or {"status": "skipped", "detail": "未运行媒体优化"},
         "missing": missing,
     }
 
@@ -446,6 +448,45 @@ def run_fetch() -> str:
     return "抓取 %d 篇" % succeeded
 
 
+MEDIA_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".mp4")
+
+
+def pillow_available() -> bool:
+    """Pillow 是可选依赖：只影响媒体压缩，缺了不影响内容准备。"""
+    try:
+        import PIL  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+def media_total_bytes(content: Path = CONTENT) -> int:
+    root = Path(content)
+    if not root.is_dir():
+        return 0
+    total = 0
+    for path in root.rglob("*"):
+        if path.is_file() and path.suffix.lower() in MEDIA_EXTS:
+            total += path.stat().st_size
+    return total
+
+
+def run_optimize_media() -> str:
+    before = media_total_bytes()
+    completed = run(
+        [PYTHON, str(TOOLS / "optimize_media.py"), "--content", str(CONTENT)],
+        "optimize_media.py",
+    )
+    output = (completed.stdout or "") + (completed.stderr or "")
+    if completed.returncode != 0:
+        raise PrepareError("optimize_media.py 退出码 %d %s" % (completed.returncode, tail(output)))
+    after = media_total_bytes()
+    converted = sum(1 for line in output.splitlines() if " -> " in line and "改写" in line)
+    if converted:
+        return "压缩 %d 张，媒体 %.1fMB → %.1fMB" % (converted, before / 1048576, after / 1048576)
+    return "无需压缩（媒体 %.1fMB）" % (after / 1048576)
+
+
 SOURCES_DIR = DEFAULT_SOURCES
 
 
@@ -498,7 +539,9 @@ def skip_existing(existing: int) -> int:
         "fetch": {"status": "skipped", "url": rel(TOOLS / "sources.json"),
                   "detail": "内容库已存在，未重新获取"},
     }
-    status = build_content_status(counts, sources)
+    status = build_content_status(
+        counts, sources,
+        {"status": "skipped", "detail": "内容库已存在，未重新压缩"})
     print("内容库已存在，跳过（共 %d 篇；--force 可重建）" % existing, flush=True)
     try:
         print("内容状态：%s" % rel(write_content_status(status)), flush=True)
@@ -545,6 +588,7 @@ def main(argv=None) -> int:
             Stage("获取 jwasham 源"),
             Stage("拆分 jwasham"),
             Stage("抓取教程正文"),
+            Stage("优化媒体"),
         ]
         actual_urls = {"hello-algo": None, "jwasham": None}
 
@@ -634,10 +678,30 @@ def main(argv=None) -> int:
             stages[4].failure(str(exc))
             warn(str(exc))
 
+        step("优化媒体（超过 300KB 的图片转 WebP）")
+        if not pillow_available():
+            detail = ("未安装 Pillow，跳过媒体压缩；运行 "
+                      "pip install -r backend/requirements-dev.txt 后重跑")
+            stages[5].skipped(detail)
+            warn(detail)
+        else:
+            try:
+                detail = run_optimize_media()
+                stages[5].success(detail)
+                ok(detail)
+            except PrepareError as exc:
+                stages[5].failure(str(exc))
+                warn(str(exc))
+
         counts = stack_counts()
         generated = body_markdown_count()
         succeeded = sum(1 for stage in stages if stage.status == "ok")
         failed = sum(1 for stage in stages if stage.status == "failed")
+        media_stage = stages[5]
+        media = {
+            "status": media_stage.status if media_stage.status in ("ok", "failed", "skipped") else "skipped",
+            "detail": media_stage.detail,
+        }
         sources = {
             "hello-algo": source_entry(counts.get("cs-basics", 0), stages[0], stages[1],
                                        actual_urls["hello-algo"]),
@@ -649,7 +713,7 @@ def main(argv=None) -> int:
                 "detail": stages[4].detail,
             },
         }
-        status = build_content_status(counts, sources)
+        status = build_content_status(counts, sources, media)
         status_file = write_content_status(status)
 
         print("", flush=True)

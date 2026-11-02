@@ -101,3 +101,6 @@ htmlcov/
 *.partial
 data/.sources/
 data/.repro/
+
+# pip 中断时在仓库根留下的临时目录/文件（两种形态都可能出现）
+/pip-*
