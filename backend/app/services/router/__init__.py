@@ -11,12 +11,22 @@
 """
 from __future__ import annotations
 
+import json
+import logging
 import re
 import unicodedata
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 from ...schemas.models import Intent, PlanSlots
 from . import rules
+
+#: 路由可观测性日志（与 `router.classify` 的 logger 同族）。
+log = logging.getLogger("pgassistant.router")
+
+#: 最近一次 `decide()` 命中的规则名。**只给可观测性用**，不参与任何判定。
+#: 用 ContextVar 而非模块全局：并发请求各自一条上下文，互不覆盖。
+_LAST_RULE: ContextVar[str] = ContextVar("pgassistant_router_last_rule", default="")
 
 # --------------------------------------------------------------- 常量话术
 #: §7.7 的统一拒绝话术（zh-CN 原文逐字照抄）。
@@ -178,6 +188,28 @@ class RouteDecision:
     clarify_options: list[str] = field(default_factory=list)
 
 
+def _l1(rule: str, decision: RouteDecision) -> RouteDecision:
+    """记一条 L1 命中事件，然后把 decision 原样返回（**不参与判定**）。
+
+    日志用一行 JSON 直接放进 message：`core/logging.py` 的 JSON Lines formatter
+    只输出固定字段，改共享设施的风险远大于收益。
+    """
+    _LAST_RULE.set(rule)
+    payload = {
+        "event": "router_l1",
+        "rule": rule,
+        "intent": decision.intent.value,
+        "confidence": decision.confidence,
+    }
+    log.info(json.dumps(payload, ensure_ascii=False))
+    return decision
+
+
+def last_l1_rule() -> str | None:
+    """最近一次 `decide()` 命中的 L1 规则名（`fallback` 表示没命中）；未跑过返回 None。"""
+    return _LAST_RULE.get() or None
+
+
 def decide(text: str, *, locale: str = "zh-CN") -> RouteDecision:
     """只跑 L1。命中即返回；**没命中时返回 `source="fallback"`**，由调用方决定是否进 L2。
 
@@ -190,39 +222,48 @@ def decide(text: str, *, locale: str = "zh-CN") -> RouteDecision:
     """
     body = normalize(text)
     if not body:
-        return RouteDecision(
+        return _l1("fallback", RouteDecision(
             intent=Intent.CLARIFY, confidence=0.0, source="fallback",
             needs_clarify=True, clarify_options=clarify_options(locale),
-        )
+        ))
 
     # §7.3 的「帮我写个快排」型委托：与 §7.4 原正则同优先级，同样零 LLM。
-    if rules.is_out_of_scope(body) or rules.is_task_delegation(body):
-        return RouteDecision(intent=Intent.OUT_OF_SCOPE, confidence=1.0, source="rule")
+    # 两条规则分开判只为在日志里区分「哪条规则吃掉的」，判定顺序与语义不变。
+    if rules.is_out_of_scope(body):
+        return _l1("oos", RouteDecision(intent=Intent.OUT_OF_SCOPE, confidence=1.0, source="rule"))
+    if rules.is_task_delegation(body):
+        return _l1("task_delegation",
+                   RouteDecision(intent=Intent.OUT_OF_SCOPE, confidence=1.0, source="rule"))
     if rules.looks_like_injection(body):
-        return RouteDecision(
+        return _l1("injection", RouteDecision(
             intent=Intent.CLARIFY, confidence=0.0, source="rule",
             needs_clarify=True, clarify_options=clarify_options(locale),
-        )
+        ))
     if rules.is_greeting(body):
-        return RouteDecision(intent=Intent.GREETING, confidence=1.0, source="rule")
+        return _l1("greeting",
+                   RouteDecision(intent=Intent.GREETING, confidence=1.0, source="rule"))
     if rules.is_capability(body):
-        return RouteDecision(intent=Intent.CAPABILITY, confidence=1.0, source="rule")
+        return _l1("capability",
+                   RouteDecision(intent=Intent.CAPABILITY, confidence=1.0, source="rule"))
     if rules.is_search_intent(body):
-        return RouteDecision(intent=Intent.RESOURCE_SEARCH, confidence=1.0, source="rule")
+        return _l1("search",
+                   RouteDecision(intent=Intent.RESOURCE_SEARCH, confidence=1.0, source="rule"))
     # C2：计划创建信号齐全 → 直接判 PLAN_CREATE，不再先丢给 L2。
     if rules.is_plan_create(body):
-        return RouteDecision(intent=Intent.PLAN_CREATE, confidence=1.0, source="rule")
+        return _l1("plan_create",
+                   RouteDecision(intent=Intent.PLAN_CREATE, confidence=1.0, source="rule"))
     # C2：只说了「想学什么」（没有方向/周数/每周投入）→ PLAN_CREATE + 方向性提问。
     if rules.is_study_goal(body):
-        return RouteDecision(
+        return _l1("plan_create", RouteDecision(
             intent=Intent.PLAN_CREATE,
             confidence=0.6,
             source="rule",
             needs_clarify=True,
             clarify_options=plan_clarify_options(locale, rules.study_topic(body)),
-        )
+        ))
 
-    return RouteDecision(intent=Intent.CLARIFY, confidence=0.0, source="fallback")
+    return _l1("fallback",
+               RouteDecision(intent=Intent.CLARIFY, confidence=0.0, source="fallback"))
 
 
 # --------------------------------------------------------------- 检索查询词
