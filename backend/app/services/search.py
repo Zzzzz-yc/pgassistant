@@ -154,6 +154,50 @@ def search(conn, q, stack=None, level=None, rtype=None, category=None,
     return {"items": items[:limit], "total": len(items), "mode": mode, "tokens": tokens}
 
 
+BROWSE_SQL = """
+    SELECT r.slug, r.title, r.summary, r.stack, r.category, r.level, r.type,
+           r.duration_min, r.author, r.license
+    FROM resources r
+    WHERE r.is_deleted = 0
+"""
+
+
+def browse(conn, stack=None, level=None, rtype=None, category=None,
+           limit=10, include_overview=False):
+    """只有方向、没有主题词时的**按槽位浏览**（`RESOURCE_SEARCH` 的降级路径）。
+
+    典型输入「给我推荐点后端的资料」：查询词里的「后端」在正文里几乎不出现，
+    靠 FTS 必然空结果；这时用 `stack` 过滤直接列出该方向的资料。返回结构与
+    `search()` 完全一致（`items` / `total` / `mode` / `tokens`）。
+
+    `mode` 固定 `"SINGLE"`（等价于"按一个方向检索"）：**不新增 SearchMode 取值**，
+    那是 `/api/search` 的既成契约（`frontend/src/types/api.ts` 也在用）。
+    """
+    filt, args = _filters(stack, level, rtype, category, include_overview)
+    sql = (BROWSE_SQL + filt +
+           " ORDER BY CASE r.level WHEN 'beginner' THEN 0"
+           " WHEN 'intermediate' THEN 1 ELSE 2 END, r.file_path, r.slug LIMIT ?")
+    try:
+        rows = conn.execute(sql, args + [max(0, limit)]).fetchall()
+    except Exception as exc:                 # 表缺失 / 只读库：空结果但不 500
+        return {"items": [], "total": 0, "mode": "error", "tokens": [], "error": str(exc)}
+
+    items = [{
+        "slug": row["slug"],
+        "title": row["title"],
+        "snippet": _snippet(row["summary"] or row["title"], []),
+        "stack": row["stack"],
+        "category": row["category"],
+        "level": row["level"],
+        "type": row["type"],
+        "duration_min": row["duration_min"],
+        "author": row["author"],
+        "license": row["license"],
+        "score": 1.0,
+    } for row in rows]
+    return {"items": items, "total": len(items), "mode": "SINGLE", "tokens": []}
+
+
 def record_miss(conn, query: str, filters: dict | None = None) -> None:
     """零结果时写 `search_misses`（§9.9：供补内容用）。
 

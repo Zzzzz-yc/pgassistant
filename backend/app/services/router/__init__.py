@@ -19,7 +19,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 from ...schemas.models import Intent, PlanSlots
-from . import rules
+from . import rules, slots
 
 #: 路由可观测性日志（与 `router.classify` 的 logger 同族）。
 log = logging.getLogger("pgassistant.router")
@@ -210,6 +210,28 @@ def last_l1_rule() -> str | None:
     return _LAST_RULE.get() or None
 
 
+def _plan_slots(text: str) -> PlanSlots:
+    """L1 判成 PLAN_CREATE 时带的槽位（规则抽取，零 LLM）。
+
+    「帮我做个 12 周前端学习计划」的 `weeks=12` / `stack=frontend` 在这里就抽出来，
+    不再等到 `_plan_request` 的兜底。`weeks` / `weekly_hours` 按契约夹取
+    （`PlanSlots` 是 `ge=4 le=52` / `ge=1 le=40`），越界值夹到边界而不是 422。
+    """
+    found = slots.extract_slots(text)
+    values: dict = {}
+    if found.goal:
+        values["goal"] = found.goal[:120]
+    if found.level:
+        values["level"] = found.level
+    if found.stack:
+        values["stack"] = found.stack
+    if found.weeks is not None:
+        values["weeks"] = min(52, max(4, found.weeks))
+    if found.weekly_hours is not None:
+        values["weekly_hours"] = min(40, max(1, found.weekly_hours))
+    return PlanSlots(**values)
+
+
 def decide(text: str, *, locale: str = "zh-CN") -> RouteDecision:
     """只跑 L1。命中即返回；**没命中时返回 `source="fallback"`**，由调用方决定是否进 L2。
 
@@ -250,14 +272,16 @@ def decide(text: str, *, locale: str = "zh-CN") -> RouteDecision:
                    RouteDecision(intent=Intent.RESOURCE_SEARCH, confidence=1.0, source="rule"))
     # C2：计划创建信号齐全 → 直接判 PLAN_CREATE，不再先丢给 L2。
     if rules.is_plan_create(body):
-        return _l1("plan_create",
-                   RouteDecision(intent=Intent.PLAN_CREATE, confidence=1.0, source="rule"))
+        return _l1("plan_create", RouteDecision(
+            intent=Intent.PLAN_CREATE, confidence=1.0, source="rule",
+            slots=_plan_slots(body)))
     # C2：只说了「想学什么」（没有方向/周数/每周投入）→ PLAN_CREATE + 方向性提问。
     if rules.is_study_goal(body):
         return _l1("plan_create", RouteDecision(
             intent=Intent.PLAN_CREATE,
             confidence=0.6,
             source="rule",
+            slots=_plan_slots(body),
             needs_clarify=True,
             clarify_options=plan_clarify_options(locale, rules.study_topic(body)),
         ))
@@ -267,22 +291,18 @@ def decide(text: str, *, locale: str = "zh-CN") -> RouteDecision:
 
 
 # --------------------------------------------------------------- 检索查询词
-_LEAD = re.compile(r"^(帮我|帮忙|请|麻烦|我想|想|能|可以)?\s*")
-_VERB = re.compile(r"^(找|搜|搜索|搜一下|查|查一下|有没有|推荐|来点|来几个|介绍|讲讲)\s*")
-_FILLER = re.compile(r"^(一下|一些|点|关于|有关|讲|说|介绍|的)\s*")
-_TAIL = re.compile(r"(的)?(资料|教程|视频|书|书籍|文档|文章|课程|内容)[。!！?？\s]*$")
-_TRIM = "的是了吗呢 。!！?？,，、"
-
-
 def query_from_search_text(text: str) -> str:
     """把「有没有讲闭包的文章」压成检索词「闭包」（§7.3 的 RESOURCE_SEARCH 执行器）。
 
+    清洗规则在 `router/slots.py::clean_query`，与槽位抽共用一套前缀/泛指词表：
+    剥掉意图前缀（我想/帮我/给我/推荐…）、检索动词（找/搜/有没有…）、口头填充
+    （一下/点/关于…）、目标动作（冲击/提升/转行…）、时间与难度词（12 周/零基础），
+    以及「资料/文章/教程/岗位/方向/工作/相关」这类泛词。
+
     抽不干净就退回整句——宁可用整句去搜，也不要空查询。
+
+    方向词（前端/后端/…）**留在这里**：`RESOURCE_SEARCH` 分支用槽位单独承载
+    `stack`，只有整句没有主题词时才把方向词当查询词（不存在"主题词 + 方向词"叠加）。
     """
     body = normalize(text)
-    cleaned = _LEAD.sub("", body)
-    cleaned = _VERB.sub("", cleaned)
-    cleaned = _FILLER.sub("", cleaned)
-    cleaned = _TAIL.sub("", cleaned)
-    cleaned = cleaned.strip(_TRIM)
-    return cleaned or body
+    return slots.clean_query(body) or body

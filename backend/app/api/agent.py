@@ -61,7 +61,13 @@ from ..services.router import (
     query_from_search_text,
     refusal,
 )
-from ..services.router.classify import classify as classify_text
+from ..services.router.classify import classify as classify_text, extract_slots_llm
+from ..services.router.slots import (
+    DIRECTION_LABEL,
+    SlotResult,
+    extract_slots,
+    merge_slots,
+)
 
 log = logging.getLogger("pgassistant.agent")
 
@@ -288,13 +294,70 @@ def _recent_messages(conn, limit: int = HISTORY_LIMIT) -> list[dict]:
 
 
 # --------------------------------------------------------------- 检索
-def _search_payload(conn, query: str) -> dict:
-    """RESOURCE_SEARCH 的执行器：与 `/api/search` 同一份结构与同一份耗时口径。"""
+async def _search_slots(message: str, locale: str, llm: LLMClient) -> SlotResult:
+    """`RESOURCE_SEARCH` 的目标槽位：规则先抽，抽不全**且**有模型时才补抽一次。
+
+    降级是产品底线：没配模型 / 模型出错都只用规则槽位，检索照常返回，不报错、不 500。
+    """
+    found = extract_slots(message, locale=locale)
+    if found.complete:
+        return found
+    if not llm.configured:
+        # 没模型：只用规则槽位，检索照常返回（产品底线），但要留一条降级日志
+        log.info("event=agent.search_slots fallback=rule reason=no_model")
+        return found
+    extra = await extract_slots_llm(message, llm, locale=locale)
+    if extra is None:
+        log.info("event=agent.search_slots fallback=rule reason=llm_failed")
+        return found
+    merged = merge_slots(found, extra)
+    log.info("event=agent.search_slots source=llm complete=%s stack=%s level=%s",
+             merged.complete, merged.stack, merged.level)
+    return merged
+
+
+def _search_query(message: str, found: SlotResult) -> str:
+    """检索词：有主题词就只用主题词；**只有方向**时才把方向词当查询词。
+
+    不把 `stack` 叠加到主题词上（「闭包 前端」这种 AND 组合正是空结果的来源），
+    `stack` 由 `search.search(stack=...)` 单独承载。返回空串时退回（截断的）原句。
+    """
+    if found.topic:
+        return found.topic
+    cleaned = query_from_search_text(message)
+    if cleaned and cleaned != normalize(message):
+        return cleaned
+    return DIRECTION_LABEL.get(found.stack or "") or cleaned or message[:100]
+
+
+def _search_payload(conn, query: str, *, stack: str | None = None,
+                    level: str | None = None) -> dict:
+    """RESOURCE_SEARCH 的执行器：与 `/api/search` 同一份结构与同一份耗时口径。
+
+    槽位过滤有两级降级（都不改契约）：
+
+    1. `stack` + `level` 一起过滤；
+    2. 命中 0 条 → 丢掉 `level` 再试一次：`level` 是"期望难度"不是硬条件，否则
+       「冲击前端岗位」会因为站内还没有 advanced 前端资料而一条都不给；
+    3. 查询词被完全清空（只有方向、没有主题词，`mode == "empty"`）→ 按 `stack`
+       浏览（`search.browse`）。真·缺内容（`mode == "miss"`）不走这一步，照常记 miss。
+    """
     started = time.perf_counter()
+    relaxed = ""
     if conn is None:                         # 纯逻辑测试（无库）也要能跑
         result = {"items": [], "total": 0, "mode": "empty", "tokens": []}
     else:
-        result = search.search(conn, query, limit=SEARCH_LIMIT)
+        result = search.search(conn, query, stack=stack, level=level, limit=SEARCH_LIMIT)
+        if result["total"] == 0 and level is not None:
+            result = search.search(conn, query, stack=stack, limit=SEARCH_LIMIT)
+            if result["total"]:
+                relaxed = "level"
+        if result["total"] == 0 and stack is not None and result["mode"] == "empty":
+            result = search.browse(conn, stack=stack, limit=SEARCH_LIMIT)
+            if result["total"]:
+                relaxed = (relaxed + "+browse") if relaxed else "browse"
+        if relaxed:
+            log.info("event=agent.search_filters relaxed=%s stack=%s", relaxed, stack)
     took_ms = max(int((time.perf_counter() - started) * 1000), 0)
     payload = {
         "query": (query or "?")[:100],
@@ -307,7 +370,9 @@ def _search_payload(conn, query: str) -> dict:
         "notice": None,
     }
     if conn is not None and not result["total"]:
-        search.record_miss(conn, query, None)
+        filters = {key: value for key, value in (("stack", stack), ("level", level))
+                   if value}
+        search.record_miss(conn, query, filters or None)
     return payload
 
 
@@ -508,8 +573,10 @@ async def _chat_events(request: Request, payload: AgentChatRequest, message: str
                                        intent=intent)
             yield _done(decision_local, kind="clarify", message_id=message_id)
         elif intent == Intent.RESOURCE_SEARCH:
-            query = query_from_search_text(message)
-            result = _search_payload(conn, query)
+            # 槽位：规则先抽（零网络），抽不全且有模型时补抽一次（见 `_search_slots`）。
+            found = await _search_slots(message, payload.locale, llm)
+            query = _search_query(message, found)
+            result = _search_payload(conn, query, stack=found.stack, level=found.level)
             yield _done(decision_local, kind="search", result=result)
         elif intent == Intent.PLAN_CREATE:
             if decision_local.needs_clarify:

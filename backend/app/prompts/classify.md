@@ -62,13 +62,16 @@
 
 - `intent`：上表 8 个值之一，**大写**。
 - `confidence`：0.0–1.0 的小数，表示你对 `intent` 的把握。
-- `slots`：只在 `PLAN_CREATE` / `PLAN_ADJUST` 时填，其余给 `null`；抽不到的字段给 `null`。
+- `slots`：只在 `PLAN_CREATE` / `PLAN_ADJUST` / `RESOURCE_SEARCH` 时填，其余给 `null`；
+  抽不到的字段给 `null`。`RESOURCE_SEARCH` 时也要填 `slots.stack` 与 `slots.goal`
+  （用户想找哪个方向的资料就填哪个栈；`goal` 写方向短语，例如"冲击前端岗位"），
+  主题词放 `goal` 里，不要编造。
   - `goal`：用户的学习目标（自由文本，不要编造岗位）。
   - `weeks`：4–52 的整数；"三个月"按 12 周、"半年"按 24 周。
   - `weekly_hours`：1–40 的整数；"每天两小时"按 14。"每周 10 小时"就填 10。
   - `level`：`beginner` / `intermediate` / `advanced`；"零基础"→ beginner。
   - `stack`：只在用户明确提到技术栈时填，取值必须是站内栈名
-    （`cs-basics`、`frontend`、`backend`、`languages`），否则 `null`。
+    （`cs-basics`、`frontend`、`backend`、`interview`、`languages`），否则 `null`。
 - `needs_clarify`：需要用户补充信息（目标不明、周数没给且无法推断）时为 `true`。
 - `clarify_options`：`needs_clarify` 为 `true` 时给 2–3 条给用户点的短句，否则空数组。
   意图是 `PLAN_CREATE` 时，选项要能顺着用户的方向直接点（生成计划 / 找入门资料 / 要路线建议）。
