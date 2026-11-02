@@ -62,7 +62,11 @@ from ..services.router import (
     refusal,
     should_escalate,
 )
-from ..services.router.classify import classify as classify_text, extract_slots_llm
+from ..services.router.classify import (
+    classify as classify_text,
+    extract_slots_llm,
+    rewrite_search_query,
+)
 from ..services.router.slots import (
     DIRECTION_LABEL,
     SlotResult,
@@ -87,6 +91,16 @@ ADVICE_MAX_TOKENS = 4096
 
 #: 检索型回答取多少张卡片（§7.3「检索 + 卡片列表」）。
 SEARCH_LIMIT = 10
+
+#: 零结果重试的硬上限：**每个请求最多一次**。
+#: 为什么是 1：重写本身要花一次模型调用；若允许「再空 → 再改写」，失败路径的成本与
+#: 延迟会随重试次数线性增长，还可能因为模型反复给出同一个无效查询而空转。第二次仍空
+#: 通常说明站内确实没有这份内容，再改写也救不回来 —— 所以只给一次机会（防抖 / 防循环）。
+_RETRY_LIMIT = 1
+
+#: 消息短于 2 字不重试：空串 / 单字（「嗯」「？」）没有可改写的语义，重写只会把噪声
+#: 再问一遍，白花一次调用。
+_RETRY_MIN_CHARS = 2
 
 #: done 里最多带几段最近历史（§7.8：最近 8 条）。只用于建议提示词与日志上下文。
 HISTORY_LIMIT = 8
@@ -416,7 +430,7 @@ def _search_query(message: str, found: SlotResult) -> str:
 
 
 def _search_payload(conn, query: str, *, stack: str | None = None,
-                    level: str | None = None) -> dict:
+                    level: str | None = None, record: bool = True) -> dict:
     """RESOURCE_SEARCH 的执行器：与 `/api/search` 同一份结构与同一份耗时口径。
 
     槽位过滤有两级降级（都不改契约）：
@@ -426,6 +440,9 @@ def _search_payload(conn, query: str, *, stack: str | None = None,
        「冲击前端岗位」会因为站内还没有 advanced 前端资料而一条都不给；
     3. 查询词被完全清空（只有方向、没有主题词，`mode == "empty"`）→ 按 `stack`
        浏览（`search.browse`）。真·缺内容（`mode == "miss"`）不走这一步，照常记 miss。
+
+    `record=False` 只给「零结果后的重写重检」用：那次查询是内部探针，不是用户输入，
+    不该在 `search_misses` 里再记一条（首轮的 miss 已经记过了）。
     """
     started = time.perf_counter()
     relaxed = ""
@@ -454,11 +471,84 @@ def _search_payload(conn, query: str, *, stack: str | None = None,
         "semantic_available": None,
         "notice": None,
     }
-    if conn is not None and not result["total"]:
+    if record and conn is not None and not result["total"]:
         filters = {key: value for key, value in (("stack", stack), ("level", level))
                    if value}
         search.record_miss(conn, query, filters or None)
     return payload
+
+
+# --------------------------------------------------------------- 零结果重试
+def _retry_eligible(conn, message: str, llm: LLMClient, first_total: int) -> bool:
+    """第三层重试的触发条件，全部满足才允许调用模型（省 token 的关键）。
+
+    1. 第一轮（含 level 放宽与 browse）最终 `total == 0`；
+    2. 有可用模型：`llm` 由 `agent_chat` 用 `load_llm_config(conn)` 构造，
+       `configured=False` ⇔ 配置为空 —— 无模型时**一次都不调用**，行为与升级前一致；
+    3. 有库可查（`conn is None` 的纯逻辑调用不重试，因为重检也只会得到空结果）；
+    4. 消息 ≥2 字：空/单字没有可改写的语义；
+    5. `_RETRY_LIMIT > 0`（显式上限，置 0 即可整体关闭）。
+    """
+    if first_total or conn is None or _RETRY_LIMIT <= 0:
+        return False
+    if len((message or "").strip()) < _RETRY_MIN_CHARS:
+        return False
+    return llm.configured
+
+
+def _log_search_retry(*, rewritten: bool, first_total: int, second_total: int,
+                      llm_used: bool) -> None:
+    """一条结构化日志（`search_retry`），字段固定、便于统计重试命中率。"""
+    log.info(json.dumps({
+        "event": "search_retry",
+        "trigger": "zero_result",
+        "rewritten": rewritten,
+        "first_total": first_total,
+        "second_total": second_total,
+        "llm_used": llm_used,
+    }, ensure_ascii=False))
+
+
+async def _search_with_retry(conn, message: str, found: SlotResult, locale: str,
+                             llm: LLMClient) -> dict:
+    """`RESOURCE_SEARCH` 的完整执行器：规则路径零结果时，用模型改写查询再检一次。
+
+    第一轮就是原来的三级降级（清洗查询词 → stack/level 过滤 → level 放宽 →
+    按 stack browse）。第一轮为空**且**满足 `_retry_eligible` 时，让模型把查询改写成
+    「站内可能存在的说法」，用 `query` / `stack` 再调一次 `search.search()`。
+
+    重写失败（脏 JSON / 超时 / `LLMError`）→ **静默放弃**：返回第一轮的空结果，
+    不抛异常、不发 error 帧。重写后仍为空 → 同样返回第一轮结果（与改动前完全一致）。
+    """
+    query = _search_query(message, found)
+    first = _search_payload(conn, query, stack=found.stack, level=found.level)
+    first_total = first["total"]
+    if not _retry_eligible(conn, message, llm, first_total):
+        return first
+
+    # 显式上限：`_RETRY_LIMIT = 1`。写成受上限约束的循环（而不是裸的 if），是为了让
+    # 「每请求最多几次」成为一个可调常量；循环体内无论结果如何都 break —— 第二轮仍空
+    # 就收手，绝不进入「再空再改写」的循环，避免烧钱与延迟叠加。
+    retried = 0
+    while retried < _RETRY_LIMIT:
+        retried += 1
+        rewrite = await rewrite_search_query(
+            message, llm, locale=locale, first_query=query, stack=found.stack)
+        if rewrite is None:
+            _log_search_retry(rewritten=False, first_total=first_total,
+                              second_total=0, llm_used=True)
+            return first
+        # 第二轮的 stack 只信模型给的值（`SearchRewrite` 已过滤成 STACKS 内的值或 None）；
+        # 沿用 `_search_payload` 的既有降级（只有方向、没有主题词时才按 stack browse），
+        # 不把「堆栈里的任意资料」当成主题命中返回。`record=False`：内部探针不记 miss。
+        second = _search_payload(conn, rewrite.query, stack=rewrite.stack, record=False)
+        second_total = second["total"]
+        _log_search_retry(rewritten=True, first_total=first_total,
+                          second_total=second_total, llm_used=True)
+        if second_total:
+            return second
+        return first
+    return first
 
 
 # --------------------------------------------------------------- 计划入参
@@ -685,9 +775,10 @@ async def _chat_events(request: Request, payload: AgentChatRequest, message: str
             yield _done(decision_local, kind="clarify", message_id=message_id)
         elif intent == Intent.RESOURCE_SEARCH:
             # 槽位：规则先抽（零网络），抽不全且有模型时补抽一次（见 `_search_slots`）。
+            # 执行器自带第三层机会：规则路径零结果 → 模型重写查询 → 再检索一次
+            # （每请求最多一次，无模型时零调用，见 `_search_with_retry`）。
             found = await _search_slots(message, payload.locale, llm)
-            query = _search_query(message, found)
-            result = _search_payload(conn, query, stack=found.stack, level=found.level)
+            result = await _search_with_retry(conn, message, found, payload.locale, llm)
             yield _done(decision_local, kind="search", result=result)
         elif intent == Intent.PLAN_CREATE:
             if decision_local.needs_clarify:
