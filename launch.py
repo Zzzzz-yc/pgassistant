@@ -176,6 +176,59 @@ def warn_if_missing_content() -> None:
     print(bar, flush=True)
 
 
+MAX_WARN_FAILED_SLUGS = 8
+
+
+def failed_slug_text(failed) -> str:
+    """失败 slug 列表：最多 8 个，超出写「等 N 篇」。"""
+    slugs = [str(item.get("slug") or "").strip() for item in failed or []
+             if isinstance(item, dict)]
+    slugs = [slug for slug in slugs if slug]
+    if not slugs:
+        return ""
+    shown = "、".join(slugs[:MAX_WARN_FAILED_SLUGS])
+    if len(slugs) > MAX_WARN_FAILED_SLUGS:
+        shown += f" 等 {len(slugs)} 篇"
+    return shown
+
+
+def warn_if_partial_fetch() -> None:
+    """教程正文抓取部分失败时打印警告；只提示，不阻断启动。
+
+    和「缺大类」不是一回事：``fetch.status`` 为 ``partial`` 表示有成功也有失败，
+    顶层 ``missing`` 仍然只表示某个大类 0 篇。
+    """
+    status = read_content_status()
+    if not status:
+        return
+    # 规范位置是 sources.fetch；顶层 fetch 也兼容（手工改状态文件时更直观）
+    fetch = status.get("fetch")
+    if not isinstance(fetch, dict):
+        sources = status.get("sources")
+        fetch = sources.get("fetch") if isinstance(sources, dict) else None
+    if not isinstance(fetch, dict) or fetch.get("status") != "partial":
+        return
+    succeeded = fetch.get("succeeded")
+    expected = fetch.get("expected")
+    total = status.get("total_articles")
+    if not isinstance(total, int):
+        total = content_body_count()
+    count_text = (f"{succeeded}/{expected}" if isinstance(succeeded, int) and isinstance(expected, int)
+                  and expected > 0 else str(fetch.get("detail") or "部分失败"))
+    slugs = failed_slug_text(fetch.get("failed"))
+    bar = "!" * 68
+    print("", flush=True)
+    print(bar, flush=True)
+    print(f"  警告：教程正文抓取部分失败（{count_text} 篇成功）", flush=True)
+    if slugs:
+        print(f"  失败 {len(fetch.get('failed') or [])} 篇：{slugs}", flush=True)
+    print(f"  当前内容库共 {total} 篇；失败页面的内容会缺失，服务仍会启动。", flush=True)
+    print("  修复：配置代理 HTTPS_PROXY 或 PG_HTTP_PROXY（例如 http://127.0.0.1:7890）后重跑：", flush=True)
+    print("        python tools/prepare_content.py --force", flush=True)
+    print(f"  失败明细：{rel(CONTENT_STATUS)}", flush=True)
+    print(bar, flush=True)
+
+
 # --------------------------------------------------------------------------
 # 进程 / 端口 / HTTP 小工具
 # --------------------------------------------------------------------------
@@ -734,6 +787,7 @@ def cmd_start(opts: Options) -> int:
 
     # 内容完整性：缺大类时给醒目警告（不阻断启动，服务照常起来）
     warn_if_missing_content()
+    warn_if_partial_fetch()
 
     # -------------------------------------------------------------------- 5. 索引
     step("准备数据库与索引（幂等，内容没变会跳过）")

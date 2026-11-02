@@ -25,9 +25,17 @@ fetch_intro.py — 抓取教程页面并提取**正文主体**，生成项目格
   python tools/fetch_intro.py --out ./content --batch all --only js-closures,sql-intro
   python tools/fetch_intro.py --list            # 看清单现状
   python tools/fetch_intro.py --report report.json   # 额外写一份抓取结果
+
+代理：默认直连；设置 ``PG_HTTP_PROXY``（优先）或 ``HTTPS_PROXY`` / ``HTTP_PROXY``
+后本进程的抓取走该代理，例如 ``PG_HTTP_PROXY=http://127.0.0.1:7890``。
+只影响本进程，不改系统或全局代理配置。
+
+结束时除 ``完成: 23/30`` 外还会打印一行机器可读汇总（tools/prepare_content.py 解析）：
+  SUMMARY: {"expected":30,"succeeded":23,"failed":[{"slug":"css-first-steps","reason":"..."}]}
 """
 import argparse
 import json
+import os
 import re
 import socket
 import time
@@ -44,6 +52,13 @@ UA = "Mozilla/5.0 (compatible; pgassistant-content-bot/1.0; +https://github.com/
 TIMEOUT = 30
 MIN_INTERVAL = 1.0
 MAX_RETRY = 2
+
+# 代理：PG_HTTP_PROXY 优先；没配时沿用 HTTPS_PROXY / HTTP_PROXY（含小写写法）。
+PROXY_ENV = "PG_HTTP_PROXY"
+PROXY_ENV_KEYS = (PROXY_ENV, "HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy")
+# 汇总行 / 状态文件里的单条失败原因最长字数
+MAX_FAIL_REASON = 120
+_OPENER = None
 
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link",
         "meta", "param", "source", "track", "wbr"}
@@ -706,8 +721,59 @@ def walk(node, ctx):
 
 
 # ---------------------------------------------------------------------------
-# 网络：robots、限速、重试
+# 网络：代理、robots、限速、重试
 # ---------------------------------------------------------------------------
+def mask_proxy(url):
+    """打印代理地址时隐去账号密码。"""
+    parts = urllib.parse.urlsplit(url)
+    if "@" not in parts.netloc:
+        return url
+    host = parts.netloc.rsplit("@", 1)[1]
+    return urllib.parse.urlunsplit(
+        (parts.scheme, "***@" + host, parts.path, parts.query, parts.fragment))
+
+
+def detect_proxy():
+    """返回 ``(代理地址, 命中的环境变量名)``；都没有时返回 ``("", "")``。"""
+    for name in PROXY_ENV_KEYS:
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            return value, name
+    return "", ""
+
+
+def configure_proxy():
+    """显式支持代理：``PG_HTTP_PROXY`` 优先，其次 ``HTTPS_PROXY`` / ``HTTP_PROXY``。
+
+    只对当前进程注入 ``HTTPS_PROXY`` / ``HTTP_PROXY``，并用 ``ProxyHandler``
+    构造抓取用的 opener；不改系统或全局代理配置。返回 ``(代理地址, 来源, opener)``。
+    """
+    global _OPENER
+    proxy, origin = detect_proxy()
+    if not proxy:
+        print("未配置代理（PG_HTTP_PROXY / HTTPS_PROXY 均未设置），直连抓取", flush=True)
+        _OPENER = urllib.request.build_opener()
+        return "", "", _OPENER
+    if origin == PROXY_ENV:
+        for name in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
+            os.environ[name] = proxy
+        print("使用代理 %s（来自 %s；本进程内已注入 HTTPS_PROXY/HTTP_PROXY）"
+              % (mask_proxy(proxy), PROXY_ENV), flush=True)
+    else:
+        print("使用代理 %s（来自 %s）" % (mask_proxy(proxy), origin), flush=True)
+    _OPENER = urllib.request.build_opener(
+        urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+    return proxy, origin, _OPENER
+
+
+def opener():
+    """抓取用的 opener：优先用 configure_proxy() 构造的那个。"""
+    global _OPENER
+    if _OPENER is None:
+        _OPENER = urllib.request.build_opener()
+    return _OPENER
+
+
 class Fetcher:
     def __init__(self, interval):
         self.interval = max(MIN_INTERVAL, float(interval or 0))
@@ -737,7 +803,7 @@ class Fetcher:
         self._wait(parts.netloc.lower())
         try:
             req = urllib.request.Request(robots_url, headers={"User-Agent": UA})
-            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            with opener().open(req, timeout=TIMEOUT) as r:
                 raw = r.read()
             text = raw.decode("utf-8", "ignore")
             parser.parse(text.splitlines())
@@ -759,7 +825,7 @@ class Fetcher:
                 "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             })
             try:
-                with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                with opener().open(req, timeout=TIMEOUT) as resp:
                     raw = resp.read()
                     charset = resp.headers.get_content_charset()
                 return decode(raw, charset)
@@ -935,6 +1001,14 @@ def body_chars_of(path):
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+def summarize_reason(text):
+    """把失败原因压成一行、最长 ``MAX_FAIL_REASON`` 字，供汇总行与状态文件使用。"""
+    plain = " ".join(str(text or "").split()) or "未知原因"
+    if len(plain) <= MAX_FAIL_REASON:
+        return plain
+    return plain[:MAX_FAIL_REASON - 1] + "…"
+
+
 def load_registry(path=REGISTRY):
     if not path.exists():
         raise SystemExit("找不到目标清单: " + str(path))
@@ -1007,9 +1081,11 @@ def main():
     if rules.get("only_summary"):
         print("提示: only_summary 已废弃，本脚本始终按完整正文模式抓取")
     max_body = int(rules.get("max_body_chars", 40000) or 0)
+    configure_proxy()
     fetcher = Fetcher(rules.get("fetch_interval_sec", MIN_INTERVAL))
     root = Path(args.out)
-    report, ok = [], 0
+    report, failed = [], []
+    ok = 0
 
     for item in targets:
         path = root / item["stack"] / item["category"] / (item["slug"] + ".md")
@@ -1021,6 +1097,7 @@ def main():
         except Exception as exc:
             row["reason"] = str(exc)
             print("FAIL", item["slug"], row["reason"])
+            failed.append({"slug": item["slug"], "reason": summarize_reason(row["reason"])})
             report.append(row)
             continue
 
@@ -1029,6 +1106,7 @@ def main():
         if err or not body or size < 200:
             row["reason"] = err or "正文过短（提取结果 %d 字）" % size
             print("FAIL", item["slug"], row["reason"])
+            failed.append({"slug": item["slug"], "reason": summarize_reason(row["reason"])})
             report.append(row)
             continue
 
@@ -1047,6 +1125,9 @@ def main():
         ok += 1
 
     print("完成:", ok, "/", len(targets))
+    print("SUMMARY: " + json.dumps(
+        {"expected": len(targets), "succeeded": ok, "failed": failed},
+        ensure_ascii=False, separators=(",", ":")), flush=True)
     if args.report:
         Path(args.report).write_text(
             json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n")

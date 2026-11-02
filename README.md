@@ -163,6 +163,12 @@ python tools/prepare_content.py
 这个源就被跳过；面试清单和教程抓取仍可能成功，于是资料库里只有前端/后端，没有算法。新版会把各源结果
 写进 `data/.sources/content-status.json`，启动时若缺少大类会直接打印警告。
 
+教程正文抓取也可能部分失败（例如 MDN 域名不可达，`fetch.status` 记为 `partial`）：启动时会打印
+「教程正文抓取部分失败」警告并列出失败的 slug，其余内容照常可用，不阻断启动。按提示配置代理
+`PG_HTTP_PROXY`（未设置时沿用 `HTTPS_PROXY` / `HTTP_PROXY`）后重跑
+`python tools/prepare_content.py --force` 即可补齐；具体失败原因见
+`data/.sources/content-status.json` 的 `fetch.failed`。
+
 修复任选一种，完成后重新启动一次（启动脚本会更新索引），或到「设置 → 索引」点一次「全量重建」：
 
 1. 配置 GitHub 镜像后重跑（国内网络推荐）：
