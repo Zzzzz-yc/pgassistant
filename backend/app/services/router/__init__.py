@@ -2,12 +2,18 @@
 
 调用顺序固定：
 
-    normalize(text) → decide(text, locale)   # 纯函数，零网络、零数据库
+    normalize(text) → decide(text, locale)    # 纯函数，零网络、零数据库
+                     ↓ should_escalate(...)   # 弱命中且有模型 → 再问一次 L2
                      ↓ source == "fallback" 时
-                     classify(text, llm)     # L2，见 router/classify.py
+                     classify(text, llm)      # L2，见 router/classify.py
 
 **越界请求在这里就结束**，绝不进入 L2（§7.2「越界拒绝必须在 L1 完成」/ §7.7
-「不允许模型自行发挥拒绝文案」）。话术是模块常量，zh-CN 与 en-US 各一份。
+「不允许模型自行发挥拒绝文案」）。问候 / 能力询问同理：规则精度足够，零 LLM。
+话术是模块常量，zh-CN 与 en-US 各一份。
+
+置信度按**规则精度**分档，不一刀切：硬命中（越界/注入/问候/能力）保持 `1.0`；
+`RESOURCE_SEARCH`、`PLAN_CREATE` 这两条规则精度不足（关键词很容易误撞），
+降到 `WEAK_CONFIDENCE`，由 `should_escalate()` 决定要不要让 L2 纠正。
 """
 from __future__ import annotations
 
@@ -176,6 +182,14 @@ def normalize(text: str, *, max_len: int = 500) -> str:
 
 
 # --------------------------------------------------------------- L1 判定
+#: 弱命中的置信度（规则精度不足以"一锤定音"，允许 L2 纠正）。
+#: 只有 `RESOURCE_SEARCH` / `PLAN_CREATE` 这两条规则用它；越界/注入/问候/能力仍是 1.0。
+WEAK_CONFIDENCE = 0.6
+
+#: 允许升级的弱意图集合（`study_goal` 的低置信命中同样落成 `PLAN_CREATE`）。
+WEAK_INTENTS = (Intent.RESOURCE_SEARCH, Intent.PLAN_CREATE)
+
+
 @dataclass(frozen=True)
 class RouteDecision:
     """L1/L2 的判定结果（契约签名，字段不得删改）。"""
@@ -268,18 +282,21 @@ def decide(text: str, *, locale: str = "zh-CN") -> RouteDecision:
         return _l1("capability",
                    RouteDecision(intent=Intent.CAPABILITY, confidence=1.0, source="rule"))
     if rules.is_search_intent(body):
-        return _l1("search",
-                   RouteDecision(intent=Intent.RESOURCE_SEARCH, confidence=1.0, source="rule"))
+        # 弱命中：「找/推荐 + 资料」只说明"想找东西"，抽不到主题词时很可能判错，
+        # 由 `should_escalate()` 再看一眼 L2（无模型时行为与之前完全一致）。
+        return _l1("search", RouteDecision(
+            intent=Intent.RESOURCE_SEARCH, confidence=WEAK_CONFIDENCE, source="rule"))
     # C2：计划创建信号齐全 → 直接判 PLAN_CREATE，不再先丢给 L2。
     if rules.is_plan_create(body):
+        # 弱命中：规划 + 学习信号齐全时仍可能只是"想问个路线建议"（ADVICE）。
         return _l1("plan_create", RouteDecision(
-            intent=Intent.PLAN_CREATE, confidence=1.0, source="rule",
+            intent=Intent.PLAN_CREATE, confidence=WEAK_CONFIDENCE, source="rule",
             slots=_plan_slots(body)))
     # C2：只说了「想学什么」（没有方向/周数/每周投入）→ PLAN_CREATE + 方向性提问。
     if rules.is_study_goal(body):
         return _l1("plan_create", RouteDecision(
             intent=Intent.PLAN_CREATE,
-            confidence=0.6,
+            confidence=WEAK_CONFIDENCE,
             source="rule",
             slots=_plan_slots(body),
             needs_clarify=True,
@@ -288,6 +305,49 @@ def decide(text: str, *, locale: str = "zh-CN") -> RouteDecision:
 
     return _l1("fallback",
                RouteDecision(intent=Intent.CLARIFY, confidence=0.0, source="fallback"))
+
+
+# --------------------------------------------------------------- L1.5 升级判据
+def should_escalate(decision: RouteDecision, message: str, locale: str = "zh-CN", *,
+                    llm_available: bool = False) -> tuple[bool, str]:
+    """弱命中要不要再问一次 L2。**纯函数**（零网络、零数据库），返回 `(should, reason)`。
+
+    只有同时满足下面全部条件才升级：
+
+    1. `decision.source == "rule"` 且 intent 是 `RESOURCE_SEARCH` / `PLAN_CREATE`
+       —— 硬命中（越界、注入、问候、能力）永不升级；
+    2. L1 没有把话说死：`RESOURCE_SEARCH` 已经在追问时不升级；
+    3. 规则信号不完整：
+       - `RESOURCE_SEARCH`：`slots.extract_slots()` 既没抽到 stack 也没抽到 topic；
+       - `PLAN_CREATE`：既没有方向（stack/goal）也没有周数，**或者 L1 自己就在追问**
+         （`study_goal`，0.6）。后者正是「规则勉强命中但判错」的样本：只想问"从哪
+         开始"的人被判成"要排计划"，不让 L2 看一次就永远纠正不了；
+    4. 调用方明确告知 `llm_available=True` —— **无模型时绝不升级**（产品底线）。
+
+    `reason` 是给 `router_decision` 日志用的短标签（英文，稳定可统计）。
+    """
+    if not llm_available:
+        return False, "no_llm"
+    if decision.source != "rule":
+        return False, "not_rule"
+    if decision.intent not in WEAK_INTENTS:
+        return False, "strong_hit"
+
+    found = slots.extract_slots(normalize(message), locale=locale)
+    if decision.intent == Intent.RESOURCE_SEARCH:
+        if decision.needs_clarify:
+            return False, "already_clarifying"
+        if found.complete:
+            return False, "search_slots_complete"
+        return True, "search_slots_incomplete"
+
+    # 方向与时间都没有：规则其实没看懂"要排什么"，交给 L2。
+    if not found.stack and not found.goal and found.weeks is None:
+        return True, "plan_slots_incomplete"
+    # L1 判成 PLAN_CREATE 却只能追问（study_goal）：规则自己也不确定。
+    if decision.needs_clarify:
+        return True, "plan_needs_clarify"
+    return False, "plan_slots_complete"
 
 
 # --------------------------------------------------------------- 检索查询词

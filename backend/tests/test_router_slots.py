@@ -315,14 +315,21 @@ def test_chat_search_complete_slots_skip_llm(client, token, llm):
 
 
 def test_chat_search_incomplete_slots_ask_llm_once(client, token, llm):
-    """规则抽不全且有模型：补抽一次，补出来的 stack 真的用于过滤。"""
+    """规则抽不全且有模型：先升级分类一次，再补抽槽位一次，补出来的 stack 真的用于过滤。
+
+    `fix/assistant/l1-escalation` 起，弱搜索（槽位不完整）会先问一次 L2 意图分类；
+    这里把分类回的也是 RESOURCE_SEARCH（0.6，且不给槽位），所以仍会走到槽位补抽。
+    """
+    llm.responses.append(chat_response(json.dumps(
+        {"intent": "RESOURCE_SEARCH", "confidence": 0.6, "slots": None,
+         "needs_clarify": False, "clarify_options": []}, ensure_ascii=False)))
     llm.responses.append(chat_response(json.dumps(
         {"stack": "frontend", "level": None, "goal": "前端布局", "topic": None,
          "weeks": None, "weekly_hours": None}, ensure_ascii=False)))
     frames = _post_chat(client, token, "帮我找点资料")
-    assert llm.calls == 1
-    assert llm.body(0)["response_format"] == {"type": "json_object"}
-    assert "USER_TEXT" in llm.body(0)["messages"][1]["content"]
+    assert llm.calls == 2                       # 升级分类 + 槽位补抽，各一次
+    assert llm.body(1)["response_format"] == {"type": "json_object"}
+    assert "USER_TEXT" in llm.body(1)["messages"][1]["content"]
     result = frames[-1][1]["result"]
     assert result["total"] >= 1
     assert all(item["stack"] == "frontend" for item in result["items"])

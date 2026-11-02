@@ -60,6 +60,7 @@ from ..services.router import (
     plan_clarify_text,
     query_from_search_text,
     refusal,
+    should_escalate,
 )
 from ..services.router.classify import classify as classify_text, extract_slots_llm
 from ..services.router.slots import (
@@ -228,6 +229,83 @@ def _intent_event(decision: RouteDecision) -> SseIntentData:
     )
 
 
+# --------------------------------------------------------------- L1.5 升级
+#: L2 推翻 L1 的置信度门槛：够高才换 intent，不够只补槽位（保 L1 的意图）。
+ESCALATION_MIN_CONFIDENCE = 0.6
+
+
+def _slot_result_from_plan(values: PlanSlots | None) -> SlotResult:
+    """契约槽位（`PlanSlots`）→ 内部 `SlotResult`（`merge_slots` 的入参）。
+
+    `PlanSlots` 没有 `topic`（检索主题词）这一栏，这里留空：合并只补方向/周数等字段，
+    检索主题词始终以 L1 的规则抽取为准（`_search_slots` 会重新抽一次）。
+    """
+    if values is None:
+        return SlotResult()
+    return SlotResult(
+        stack=values.stack,
+        level=values.level.value if hasattr(values.level, "value") else values.level,
+        goal=values.goal,
+        weeks=values.weeks,
+        weekly_hours=values.weekly_hours,
+        complete=bool(values.stack or values.goal),
+    )
+
+
+def _plan_slots_from_result(found: SlotResult) -> PlanSlots | None:
+    """`SlotResult` → 契约槽位；空的返回 None（别给 intent 帧塞一个空对象）。
+
+    `weeks` / `weekly_hours` 按 `PlanSlots` 的边界夹取（越界值夹到边界，不 422）。
+    """
+    values: dict = {}
+    if found.goal:
+        values["goal"] = found.goal[:120]
+    if found.level:
+        values["level"] = found.level
+    if found.stack:
+        values["stack"] = found.stack
+    if found.weeks is not None:
+        values["weeks"] = min(52, max(4, found.weeks))
+    if found.weekly_hours is not None:
+        values["weekly_hours"] = min(40, max(1, found.weekly_hours))
+    return PlanSlots(**values) if values else None
+
+
+def merge_escalation(decision: RouteDecision, llm_decision: RouteDecision,
+                     message: str, locale: str = "zh-CN") -> RouteDecision:
+    """把 L2 的分类结果并回 L1 的弱命中（纯函数，便于单测）。
+
+    - L2 成功且 `confidence >= ESCALATION_MIN_CONFIDENCE` → **以 L2 的 intent 为准**；
+    - L2 成功但置信度不足 → **保留 L1 的 intent**，只合并槽位；
+    - 槽位一律 `slots.merge_slots(规则槽位, L2 槽位)`：规则优先，模型只填空位。
+    - L2 自己降级成 `source="fallback"`（两次输出都不合法）不算成功，按低置信处理。
+    """
+    base = (_slot_result_from_plan(decision.slots) if decision.slots is not None
+            else extract_slots(message, locale=locale))
+    merged = merge_slots(base, _slot_result_from_plan(llm_decision.slots))
+    slots_out = _plan_slots_from_result(merged)
+
+    trusted = llm_decision.source == "llm" and \
+        llm_decision.confidence >= ESCALATION_MIN_CONFIDENCE
+    if trusted:
+        return RouteDecision(
+            intent=llm_decision.intent,
+            confidence=llm_decision.confidence,
+            source="llm",
+            slots=slots_out,
+            needs_clarify=llm_decision.needs_clarify,
+            clarify_options=list(llm_decision.clarify_options),
+        )
+    return RouteDecision(
+        intent=decision.intent,
+        confidence=decision.confidence,
+        source=decision.source,
+        slots=slots_out if slots_out is not None else decision.slots,
+        needs_clarify=decision.needs_clarify,
+        clarify_options=list(decision.clarify_options),
+    )
+
+
 # --------------------------------------------------------------- 路由可观测性
 #: `text_head` 的截断长度。日志在本机，但仍按最小化原则只留开头，不落完整原文。
 TEXT_HEAD_LIMIT = 80
@@ -243,11 +321,16 @@ def _text_fingerprint(text: str) -> dict:
     }
 
 
-def _log_decision(decision: RouteDecision, text: str, *, rule: str | None) -> None:
+def _log_decision(decision: RouteDecision, text: str, *, rule: str | None,
+                  escalated: bool = False, escalation_reason: str = "") -> None:
     """记一次**最终**路由决策（一次请求一条）；只写日志，不参与任何判定。
 
     `rule` 只有 L1 命中时非空；走 L2 的样本留 null，好让 `scripts/router_stats.py`
     把「哪条规则吃掉的」和「模型判的」分开统计。
+
+    `escalated` / `escalation_reason` 是**新增**字段（原有字段一个不动）：前者表示
+    这一条有没有真的问过 L2，后者是 `should_escalate()` 给出的短标签，方便统计
+    「哪些弱命中被升级」「哪些因为槽位够用而没升级」。
     """
     payload = {
         "event": "router_decision",
@@ -255,6 +338,8 @@ def _log_decision(decision: RouteDecision, text: str, *, rule: str | None) -> No
         "intent": getattr(decision.intent, "value", decision.intent),
         "confidence": decision.confidence,
         "rule": rule,
+        "escalated": bool(escalated),
+        "escalation_reason": escalation_reason,
     }
     payload.update(_text_fingerprint(text))
     log.info(json.dumps(payload, ensure_ascii=False))
@@ -478,10 +563,6 @@ async def agent_chat(request: Request, payload: AgentChatRequest, conn=Depends(g
                     hint="输入一句话，例如「有没有讲闭包的文章」")
 
     decision = decide(message, locale=payload.locale)
-    # L1 命中时决策已定、不会再进 L2，这里就记下这一条（一次请求一条）。
-    # 没命中的样本在 `_chat_events` 里等 L2 返回后再记，避免同一条请求写两条。
-    if decision.source == "rule":
-        _log_decision(decision, message, rule=last_l1_rule())
     config = load_llm_config(conn)
     # L1 的计划意图但信息不足（「我想学前端」）用常量话术追问，零 LLM（C2）；
     # fallback（需要 L2）与真正要生成/调整/建议的意图才要求模型可用。
@@ -496,7 +577,30 @@ async def agent_chat(request: Request, payload: AgentChatRequest, conn=Depends(g
         )
 
     llm = LLMClient(config)
-    events = _chat_events(request, payload, message, decision, llm)
+    # L1 弱命中（search / plan_create）**且**有模型时再问一次 L2：规则命中 ≠ 判对。
+    # 无模型时 `should_escalate` 永远返回 False，行为与升级前完全一致（产品底线）。
+    escalate, escalation_reason = should_escalate(
+        decision, message, payload.locale, llm_available=config is not None)
+    escalated = False
+    if escalate:
+        try:
+            llm_decision = await classify_text(message, llm, locale=payload.locale)
+        except LLMError as exc:
+            # 升级失败不是用户的问题：保留 L1，只记一条 warn，绝不发 error 帧。
+            log.warning("event=agent.escalation result=l1 code=%s reason=%s",
+                        exc.code, escalation_reason)
+        else:
+            decision = merge_escalation(decision, llm_decision, message, payload.locale)
+            escalated = True
+            log.info("event=agent.escalation result=l2 intent=%s confidence=%.2f reason=%s",
+                     decision.intent.value, decision.confidence, escalation_reason)
+    # 一次请求一条最终决策：L1 命中（含升级后）在这里记，fallback 的那条在 `_chat_events`。
+    if decision.source != "fallback":
+        _log_decision(decision, message, rule=last_l1_rule(),
+                      escalated=escalated, escalation_reason=escalation_reason)
+
+    events = _chat_events(request, payload, message, decision, llm,
+                          escalation_reason=escalation_reason)
     return StreamingResponse(
         _guarded(events),
         media_type="text/event-stream",
@@ -524,8 +628,13 @@ async def _guarded(events):
 
 
 async def _chat_events(request: Request, payload: AgentChatRequest, message: str,
-                       decision: RouteDecision, llm: LLMClient):
-    """一次对话的完整事件流：intent → (delta)* → (done|error)。"""
+                       decision: RouteDecision, llm: LLMClient,
+                       escalation_reason: str = "not_rule"):
+    """一次对话的完整事件流：intent → (delta)* → (done|error)。
+
+    `escalation_reason` 只用于日志：fallback 这条路不走 L1.5 升级（本来就要进 L2），
+    记 false + 调用方给的标签即可（`router_decision` 的字段一个不少）。
+    """
     started = time.perf_counter()
     conn = None
     decision_local = decision
@@ -536,12 +645,14 @@ async def _chat_events(request: Request, payload: AgentChatRequest, message: str
                 decision_local = await classify_text(message, llm, locale=payload.locale)
             except LLMError as exc:
                 # L2 故障：决策停在 L1 的 fallback 上（source=fallback），error 帧前也留一条日志。
-                _log_decision(decision_local, message, rule=None)
+                _log_decision(decision_local, message, rule=None,
+                              escalation_reason=escalation_reason)
                 yield _intent_event(decision_local)
                 yield _sse_error(exc)
                 return
             # 最终决策来源是 llm（含低置信度降级成 CLARIFY 的情况）。
-            _log_decision(decision_local, message, rule=None)
+            _log_decision(decision_local, message, rule=None,
+                          escalation_reason=escalation_reason)
         yield _intent_event(decision_local)
 
         conn = connect(_db_path())
