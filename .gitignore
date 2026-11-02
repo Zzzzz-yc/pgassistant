@@ -82,3 +82,22 @@ handoff/
 # 13 MB 二进制不入库；离线前提是至少完成过一次 npm install）
 frontend/public/assets/pyodide/
 frontend/public/pyodide/
+
+# 本地导出物与编辑器/合并临时文件（防止顺手把成品文档或冲突残渣提交）
+*.docx
+*.bak
+*.orig
+*.rej
+*.tmp
+*.swp
+coverage/
+.coverage
+htmlcov/
+.mypy_cache/
+.eslintcache
+
+# 内容准备过程中的中间产物（`data/` 已整体忽略，这里再显式兜一层，
+# 防止有人临时把 --sources 指到仓库内其它位置）
+*.partial
+data/.sources/
+data/.repro/

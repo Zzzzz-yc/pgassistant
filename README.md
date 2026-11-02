@@ -157,6 +157,36 @@ python tools/prepare_content.py
 通常是内容库没有准备成功。先运行上面的 `python tools/prepare_content.py`，成功后到
 「设置 → 索引」点一次「全量重建」，再刷新页面。如果之前手动删过 `content/`，也需要重新准备。
 
+### 资料库没有算法内容 / 内容不全
+
+算法内容全部来自 hello-algo：首次运行会从 GitHub 浅克隆后转换。GitHub 访问失败或很慢时，克隆会失败，
+这个源就被跳过；面试清单和教程抓取仍可能成功，于是资料库里只有前端/后端，没有算法。新版会把各源结果
+写进 `data/.sources/content-status.json`，启动时若缺少大类会直接打印警告。
+
+修复任选一种，完成后重新启动一次（启动脚本会更新索引），或到「设置 → 索引」点一次「全量重建」：
+
+1. 配置 GitHub 镜像后重跑（国内网络推荐）：
+
+   ```bash
+   PG_GIT_MIRROR=https://ghfast.top/https://github.com python tools/prepare_content.py --force
+   ```
+
+   Windows cmd 先执行 `set PG_GIT_MIRROR=https://ghfast.top/https://github.com`，再执行
+   `python tools/prepare_content.py --force`。镜像域名换成你实际可用的；配置后可以用
+   `python tools/prepare_content.py --print-sources` 确认实际会尝试的地址。
+2. 给 git 配置代理后重跑：
+
+   ```bash
+   git config --global http.proxy http://127.0.0.1:7890
+   python tools/prepare_content.py --force
+   ```
+
+3. 网络已恢复时直接重跑：
+
+   ```bash
+   python tools/prepare_content.py --force
+   ```
+
 ### 模型连接失败
 
 设置页会显示上游返回的原文。常见原因：API Key 填错或已失效、Base URL 路径不对、模型在当前账号下
