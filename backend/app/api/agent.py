@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
@@ -54,6 +55,7 @@ from ..services.router import (
     clarify_text,
     decide,
     greeting_text,
+    last_l1_rule,
     normalize,
     plan_clarify_text,
     query_from_search_text,
@@ -220,6 +222,38 @@ def _intent_event(decision: RouteDecision) -> SseIntentData:
     )
 
 
+# --------------------------------------------------------------- 路由可观测性
+#: `text_head` 的截断长度。日志在本机，但仍按最小化原则只留开头，不落完整原文。
+TEXT_HEAD_LIMIT = 80
+
+
+def _text_fingerprint(text: str) -> dict:
+    """`text_len` / `text_head`（≤80 字）/ `text_sha1`（前 8 位）——方便按原文反查同一条。"""
+    body = text or ""
+    return {
+        "text_len": len(body),
+        "text_head": body[:TEXT_HEAD_LIMIT],
+        "text_sha1": hashlib.sha1(body.encode("utf-8")).hexdigest()[:8],
+    }
+
+
+def _log_decision(decision: RouteDecision, text: str, *, rule: str | None) -> None:
+    """记一次**最终**路由决策（一次请求一条）；只写日志，不参与任何判定。
+
+    `rule` 只有 L1 命中时非空；走 L2 的样本留 null，好让 `scripts/router_stats.py`
+    把「哪条规则吃掉的」和「模型判的」分开统计。
+    """
+    payload = {
+        "event": "router_decision",
+        "source": decision.source,
+        "intent": getattr(decision.intent, "value", decision.intent),
+        "confidence": decision.confidence,
+        "rule": rule,
+    }
+    payload.update(_text_fingerprint(text))
+    log.info(json.dumps(payload, ensure_ascii=False))
+
+
 # --------------------------------------------------------------- 历史（best-effort）
 def _save_message(conn, role: str, content: str, *, intent=None, model=None,
                   tokens_in=None, tokens_out=None) -> int | None:
@@ -379,6 +413,10 @@ async def agent_chat(request: Request, payload: AgentChatRequest, conn=Depends(g
                     hint="输入一句话，例如「有没有讲闭包的文章」")
 
     decision = decide(message, locale=payload.locale)
+    # L1 命中时决策已定、不会再进 L2，这里就记下这一条（一次请求一条）。
+    # 没命中的样本在 `_chat_events` 里等 L2 返回后再记，避免同一条请求写两条。
+    if decision.source == "rule":
+        _log_decision(decision, message, rule=last_l1_rule())
     config = load_llm_config(conn)
     # L1 的计划意图但信息不足（「我想学前端」）用常量话术追问，零 LLM（C2）；
     # fallback（需要 L2）与真正要生成/调整/建议的意图才要求模型可用。
@@ -432,9 +470,13 @@ async def _chat_events(request: Request, payload: AgentChatRequest, message: str
             try:
                 decision_local = await classify_text(message, llm, locale=payload.locale)
             except LLMError as exc:
+                # L2 故障：决策停在 L1 的 fallback 上（source=fallback），error 帧前也留一条日志。
+                _log_decision(decision_local, message, rule=None)
                 yield _intent_event(decision_local)
                 yield _sse_error(exc)
                 return
+            # 最终决策来源是 llm（含低置信度降级成 CLARIFY 的情况）。
+            _log_decision(decision_local, message, rule=None)
         yield _intent_event(decision_local)
 
         conn = connect(_db_path())
