@@ -360,14 +360,18 @@ PLAN_NON_CREATE_SAMPLES = [
 
 
 def test_plan_create_rule_positive_and_negative():
-    """C2：规划信号 + 学习信号 → PLAN_CREATE，零 LLM；两个既有边界原样保留。"""
+    """C2：规划信号 + 学习信号 → PLAN_CREATE，零 LLM；两个既有边界原样保留。
+
+    L1 的置信度按规则精度分档（`fix/assistant/l1-escalation`）：`plan_create` 是弱命中，
+    置信度 `WEAK_CONFIDENCE`（0.6），可能被 L2 纠正；越界/问候仍是 1.0。
+    """
     for sample in PLAN_CREATE_SAMPLES:
         assert router_pkg.rules.is_plan_create(sample) is True, sample
         decision = router_pkg.decide(sample)
         assert decision.intent.value == "PLAN_CREATE", sample
         assert decision.source == "rule"
         assert decision.needs_clarify is False
-        assert decision.confidence == 1.0
+        assert decision.confidence == router_pkg.WEAK_CONFIDENCE
 
     for sample in PLAN_NON_CREATE_SAMPLES:
         assert router_pkg.rules.is_plan_create(sample) is False, sample
