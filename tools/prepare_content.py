@@ -23,6 +23,9 @@
 * ``PG_HELLO_ALGO_URL`` / ``PG_JWASHAM_URL``：直接指定仓库地址；指定后只尝试该地址。
 * ``PG_GIT_MIRROR``：GitHub 前缀式镜像，例如
   ``https://ghfast.top/https://github.com``；镜像失败会自动回退官方地址。
+* ``PG_HTTP_PROXY``：抓取外站教程正文时使用的 HTTP 代理，例如
+  ``http://127.0.0.1:7890``；未设置时沿用 ``HTTPS_PROXY`` / ``HTTP_PROXY``。
+  只影响抓取子进程，不改系统或全局代理配置。
 
 每次运行都会把内容完整性写入 ``data/.sources/content-status.json``。
 hello-algo 是算法内容（cs-basics）的唯一来源：它没有产出任何文章时，即使其它源
@@ -423,7 +426,79 @@ def run_split() -> str:
     return "拆分 %d 篇" % count
 
 
-def run_fetch() -> str:
+def parse_fetch_output(output: str):
+    """从 fetch_intro.py 输出解析 ``完成: 23/30`` 与 ``SUMMARY: {...}``。
+
+    返回 ``(完成行, 汇总 dict 或 None)``；SUMMARY 缺失时调用方回退到完成行。
+    """
+    done = None
+    summary = None
+    for line in output.splitlines():
+        if line.startswith("完成:"):
+            done = line
+        elif line.startswith("SUMMARY:"):
+            try:
+                payload = json.loads(line.split(":", 1)[1].strip())
+            except ValueError:
+                payload = None
+            if isinstance(payload, dict):
+                summary = payload
+    return done, summary
+
+
+def normalize_fetch_failures(items) -> list:
+    """整理失败明细：slug 必填，原因压成一行且不超过 120 字。"""
+    failures = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        slug = str(item.get("slug") or "").strip()
+        if not slug:
+            continue
+        reason = " ".join(str(item.get("reason") or "").split()) or "未知原因"
+        if len(reason) > 120:
+            reason = reason[:119] + "…"
+        failures.append({"slug": slug, "reason": reason})
+    return failures
+
+
+def fetch_entry(result) -> dict:
+    """把一次抓取结果整理成状态文件里的 ``fetch`` 项。
+
+    ``status``：全部成功为 ``ok``；有成功也有失败为 ``partial``；全部失败为 ``failed``。
+    它和顶层 ``missing`` 语义不同，后者仍只表示某个大类 0 篇。
+    """
+    url = rel(TOOLS / "sources.json")
+    if not result:
+        return {"status": "failed", "url": url, "expected": 0, "succeeded": 0,
+                "detail": "抓取未产生结果", "failed": []}
+    expected = int(result.get("expected") or 0)
+    succeeded = int(result.get("succeeded") or 0)
+    failed = normalize_fetch_failures(result.get("failed"))
+    if expected > 0 and succeeded >= expected:
+        status = "ok"
+    elif succeeded > 0:
+        status = "partial"
+    else:
+        status = "failed"
+    if not result.get("detail"):
+        detail = "抓取 %d 篇" % succeeded
+        if succeeded <= 0:
+            detail = "抓取全部失败"
+        elif expected > 0 and succeeded < expected:
+            detail = "抓取 %d/%d 篇" % (succeeded, expected)
+    else:
+        detail = str(result["detail"])
+    return {"status": status, "url": url, "expected": expected,
+            "succeeded": succeeded, "detail": detail, "failed": failed}
+
+
+def run_fetch() -> dict:
+    """运行抓取并返回 ``{expected, succeeded, failed, detail}``。
+
+    全部失败也正常返回（succeeded=0），由调用方把阶段标成失败；只有完全没有
+    输出结果时才抛 :class:`PrepareError`。
+    """
     completed = run(
         [PYTHON, str(TOOLS / "fetch_intro.py"), "--out", str(CONTENT), "--batch", "all"],
         "fetch_intro.py",
@@ -431,21 +506,31 @@ def run_fetch() -> str:
     output = (completed.stdout or "") + (completed.stderr or "")
     if completed.returncode != 0:
         raise PrepareError("fetch_intro.py 退出码 %d %s" % (completed.returncode, tail(output)))
-    done = None
-    for line in output.splitlines():
-        if line.startswith("完成:"):
-            done = line
-    if not done:
+    done, summary = parse_fetch_output(output)
+    if summary is None and not done:
         raise PrepareError("fetch_intro.py 没有输完成情况：" + tail(output, 2))
-    try:
-        succeeded, total = [int(part.strip()) for part in done.split(":", 1)[1].split("/", 1)]
-    except ValueError:
-        succeeded, total = 0, 0
+    expected = succeeded = 0
+    failed = []
+    if summary is not None:
+        try:
+            expected = int(summary.get("expected") or 0)
+            succeeded = int(summary.get("succeeded") or 0)
+        except (TypeError, ValueError):
+            expected, succeeded = 0, 0
+        failed = normalize_fetch_failures(summary.get("failed"))
+    if expected <= 0 and done:
+        try:
+            succeeded, expected = [
+                int(part.strip()) for part in done.split(":", 1)[1].split("/", 1)]
+        except ValueError:
+            expected = expected or succeeded
+    detail = "抓取 %d 篇" % succeeded
     if succeeded <= 0:
-        raise PrepareError("教程正文抓取全部失败 %s" % tail(output, 2))
-    if succeeded < total:
-        return "抓取 %d/%d 篇（其余失败，见日志）" % (succeeded, total)
-    return "抓取 %d 篇" % succeeded
+        detail = "抓取全部失败"
+    elif expected > 0 and succeeded < expected:
+        detail = "抓取 %d/%d 篇" % (succeeded, expected)
+    return {"expected": expected, "succeeded": succeeded,
+            "failed": failed, "detail": detail}
 
 
 MEDIA_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".mp4")
@@ -670,10 +755,15 @@ def main(argv=None) -> int:
             stages[3].skipped("源不可用")
 
         step("抓取教程正文")
+        fetch_result = None
         try:
-            detail = run_fetch()
-            stages[4].success(detail)
-            ok(detail)
+            fetch_result = run_fetch()
+            if fetch_result["succeeded"] > 0:
+                stages[4].success(fetch_result["detail"])
+                ok(fetch_result["detail"])
+            else:
+                stages[4].failure("教程正文抓取全部失败，见 %s" % rel(LOG_PATH))
+                warn(stages[4].detail)
         except PrepareError as exc:
             stages[4].failure(str(exc))
             warn(str(exc))
@@ -707,8 +797,8 @@ def main(argv=None) -> int:
                                        actual_urls["hello-algo"]),
             "jwasham": source_entry(counts.get("interview", 0), stages[2], stages[3],
                                     actual_urls["jwasham"]),
-            "fetch": {
-                "status": stages[4].status if stages[4].status in ("ok", "failed") else "skipped",
+            "fetch": fetch_entry(fetch_result) if fetch_result is not None else {
+                "status": "failed" if stages[4].status == "failed" else "skipped",
                 "url": rel(TOOLS / "sources.json"),
                 "detail": stages[4].detail,
             },

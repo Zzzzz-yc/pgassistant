@@ -158,3 +158,129 @@ def test_launch_silent_when_complete(launch, tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(launch, "CONTENT_STATUS", status_path)
     launch.warn_if_missing_content()
     assert capsys.readouterr().out == ""
+
+
+# --------------------------------------------------------------------------
+# 抓取部分失败：状态文件明细与启动提示
+# --------------------------------------------------------------------------
+def test_parse_fetch_output_reads_summary(prepare):
+    output = "\n".join([
+        "FAIL css-first-steps 连接失败：[Errno 11002] getaddrinfo failed",
+        "完成: 23 / 30",
+        'SUMMARY: {"expected":30,"succeeded":23,"failed":'
+        '[{"slug":"css-first-steps","reason":"连接失败：[Errno 11002] getaddrinfo failed"}]}',
+    ])
+    done, summary = prepare.parse_fetch_output(output)
+    assert done == "完成: 23 / 30"
+    assert summary["expected"] == 30
+    assert summary["succeeded"] == 23
+    assert summary["failed"] == [{
+        "slug": "css-first-steps",
+        "reason": "连接失败：[Errno 11002] getaddrinfo failed",
+    }]
+
+
+def test_parse_fetch_output_tolerates_missing_summary(prepare):
+    done, summary = prepare.parse_fetch_output("FAIL a 连接失败\n完成: 0 / 1")
+    assert done == "完成: 0 / 1"
+    assert summary is None
+
+
+def test_fetch_entry_marks_partial(prepare):
+    entry = prepare.fetch_entry({
+        "expected": 30, "succeeded": 23,
+        "failed": [{"slug": "css-first-steps", "reason": "getaddrinfo failed"}],
+        "detail": "抓取 23/30 篇",
+    })
+    assert entry["status"] == "partial"
+    assert entry["url"] == "tools/sources.json"
+    assert entry["expected"] == 30
+    assert entry["succeeded"] == 23
+    assert entry["failed"] == [{"slug": "css-first-steps", "reason": "getaddrinfo failed"}]
+
+
+def test_fetch_entry_ok_and_failed(prepare):
+    assert prepare.fetch_entry(
+        {"expected": 30, "succeeded": 30, "failed": []})["status"] == "ok"
+    assert prepare.fetch_entry(
+        {"expected": 30, "succeeded": 0, "failed": []})["status"] == "failed"
+    assert prepare.fetch_entry(None)["status"] == "failed"
+    assert prepare.fetch_entry(None)["expected"] == 0
+
+
+def test_fetch_failures_normalized_and_truncated(prepare):
+    failures = prepare.normalize_fetch_failures([
+        {"slug": "a", "reason": "连接失败：" + "x" * 500},
+        {"slug": "", "reason": "无 slug"},
+        {"reason": "缺 slug"},
+        "not-a-dict",
+    ])
+    assert [item["slug"] for item in failures] == ["a"]
+    assert len(failures[0]["reason"]) <= 120
+
+
+def write_status(path: Path, payload: dict) -> None:
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+
+def test_launch_warns_when_fetch_partial(launch, tmp_path, monkeypatch, capsys):
+    status_path = tmp_path / "content-status.json"
+    write_status(status_path, {
+        "total_articles": 147,
+        "missing": [],
+        "sources": {"fetch": {
+            "status": "partial",
+            "expected": 30,
+            "succeeded": 23,
+            "failed": [{"slug": "slug-%02d" % i, "reason": "getaddrinfo failed"}
+                       for i in range(10)],
+        }},
+    })
+    monkeypatch.setattr(launch, "CONTENT_STATUS", status_path)
+    launch.warn_if_missing_content()
+    launch.warn_if_partial_fetch()
+    out = capsys.readouterr().out
+    assert "23/30" in out
+    assert "slug-00" in out and "slug-07" in out
+    assert "slug-08" not in out
+    assert "等 10 篇" in out
+    assert "HTTPS_PROXY" in out and "PG_HTTP_PROXY" in out
+    assert "tools/prepare_content.py --force" in out
+
+
+def test_launch_warns_when_top_level_fetch_partial(launch, tmp_path, monkeypatch, capsys):
+    status_path = tmp_path / "content-status.json"
+    write_status(status_path, {
+        "total_articles": 147,
+        "missing": [],
+        "fetch": {"status": "partial", "expected": 30, "succeeded": 23,
+                  "failed": [{"slug": "css-first-steps", "reason": "getaddrinfo failed"}]},
+    })
+    monkeypatch.setattr(launch, "CONTENT_STATUS", status_path)
+    launch.warn_if_partial_fetch()
+    out = capsys.readouterr().out
+    assert "23/30" in out
+    assert "css-first-steps" in out
+
+
+def test_launch_silent_when_fetch_ok(launch, tmp_path, monkeypatch, capsys):
+    status_path = tmp_path / "content-status.json"
+    write_status(status_path, {
+        "total_articles": 150,
+        "missing": [],
+        "sources": {"fetch": {"status": "ok", "expected": 30,
+                              "succeeded": 30, "failed": []}},
+    })
+    monkeypatch.setattr(launch, "CONTENT_STATUS", status_path)
+    launch.warn_if_missing_content()
+    launch.warn_if_partial_fetch()
+    assert capsys.readouterr().out == ""
+
+
+def test_launch_silent_when_fetch_status_missing(launch, tmp_path, monkeypatch, capsys):
+    status_path = tmp_path / "content-status.json"
+    write_status(status_path, {"total_articles": 150, "missing": []})
+    monkeypatch.setattr(launch, "CONTENT_STATUS", status_path)
+    launch.warn_if_missing_content()
+    launch.warn_if_partial_fetch()
+    assert capsys.readouterr().out == ""
