@@ -28,6 +28,7 @@ from ..llm_client import (
     strip_fences,
 )
 from . import RouteDecision, clarify_options, normalize, plan_clarify_options
+from .slots import LEVELS, STACKS, SlotResult
 
 log = logging.getLogger("pgassistant.router.classify")
 
@@ -165,3 +166,89 @@ def _to_route(decision: _Decision, locale: str) -> RouteDecision:
         needs_clarify=False,
         clarify_options=options,
     )
+
+
+# --------------------------------------------------------------- 槽位补抽
+class _SlotPayload(BaseModel):
+    """槽位补抽的输出校验模型（**不是** API 契约模型，只用来兜住脏数据）。"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    stack: str | None = None
+    level: str | None = None
+    goal: str | None = None
+    topic: str | None = None
+    weeks: int | None = None
+    weekly_hours: int | None = None
+
+
+def _parse_slots(text: str) -> _SlotPayload:
+    """剥围栏 → `json.loads` → Pydantic。任何一步失败都抛 `ValueError`。"""
+    body = strip_fences(text)
+    if not body:
+        raise ValueError("空输出")
+    try:
+        data = json.loads(body)
+    except ValueError as exc:
+        raise ValueError("不是合法 JSON: %s" % exc) from exc
+    if not isinstance(data, dict):
+        raise ValueError("顶层必须是 JSON 对象")
+    try:
+        return _SlotPayload.model_validate(data)
+    except ValidationError as exc:
+        raise ValueError(_short_errors(exc)) from exc
+
+
+def _text_slot(value: str | None) -> str | None:
+    body = (value or "").strip()
+    return body[:120] or None
+
+
+def _to_slot_result(payload: _SlotPayload) -> SlotResult:
+    """模型输出 → `SlotResult`；越界值一律丢弃（不抛异常）。"""
+    stack = (payload.stack or "").strip().lower()
+    stack = stack if stack in STACKS else None
+    level = (payload.level or "").strip().lower()
+    level = level if level in LEVELS else None
+    weeks = payload.weeks
+    if weeks is not None and not (1 <= weeks <= 520):
+        weeks = None
+    hours = payload.weekly_hours
+    if hours is not None and not (1 <= hours <= 168):
+        hours = None
+    topic = _text_slot(payload.topic)
+    return SlotResult(
+        stack=stack,
+        level=level,
+        goal=_text_slot(payload.goal),
+        topic=topic,
+        weeks=weeks,
+        weekly_hours=hours,
+        complete=bool(stack or topic),
+        source="llm",
+    )
+
+
+async def extract_slots_llm(text: str, llm: LLMClient, *,
+                            locale: str = "zh-CN") -> SlotResult | None:
+    """L2 槽位补抽：规则抽不全时才由调用方调用，**一次调用、不重试**。
+
+    - 走与 `classify()` 相同的 `response_format={"type":"json_object"}` 机制
+      （`_ask` 负责上游不支持时的纯提示词降级）；
+    - 输出必须过 Pydantic；网络 / 鉴权 / 非 JSON / 字段类型不对 **一律返回 `None`**，
+      由调用方降级到规则槽位 —— 绝不把异常抛回 API 层（检索不能因为模型故障 500）。
+    """
+    body = normalize(text)
+    if not body:
+        return None
+    messages = [
+        {"role": "system", "content": load_prompt("slots")},
+        {"role": "user",
+         "content": "USER_TEXT:\n" + body + "\n\nLOCALE: " + (locale or "zh-CN")},
+    ]
+    try:
+        reply = await _ask(llm, messages)
+        return _to_slot_result(_parse_slots(reply))
+    except (LLMError, ValueError) as exc:
+        log.info("event=router.slots fallback=rule reason=%s", type(exc).__name__)
+        return None
