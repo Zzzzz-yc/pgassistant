@@ -9,7 +9,7 @@
 import { ChevronLeft, ChevronRight, Layers } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { localizedLabel } from "@/lib/labels";
 import { useTaxonomy } from "@/lib/query";
@@ -84,6 +84,13 @@ function ChapterTree({ taxonomy, onNavigate }: ChapterTreeProps) {
   // 链接参数始终是 stack / category 的 key，不能用显示名代替。
   const language = i18n.resolvedLanguage ?? i18n.language;
   const { data, isLoading, isError } = taxonomy;
+  // 当前选中的分类（加分项）：只认 /library 且 stack+category 都命中的那一行。
+  // 不用单一 category 判定，避免不同技术栈下的同名 key 同时高亮。
+  const location = useLocation();
+  const activeFilters = new URLSearchParams(location.search);
+  const isLibrary = location.pathname === "/library";
+  const activeStack = isLibrary ? activeFilters.get("stack") : null;
+  const activeCategory = isLibrary ? activeFilters.get("category") : null;
 
   if (isLoading) {
     return (
@@ -111,12 +118,28 @@ function ChapterTree({ taxonomy, onNavigate }: ChapterTreeProps) {
             {localizedLabel(stack.label, language) ?? stack.stack}
             <span className="sidebar__count tnum">{stack.total}</span>
           </Link>
-          {stack.categories.map((category) => (
-            <span className="sidebar__item" key={`${stack.stack}/${category.category}`}>
-              {localizedLabel(category.label, language) ?? category.category}
-              <span className="sidebar__count tnum">{category.count}</span>
-            </span>
-          ))}
+          {stack.categories.map((category) => {
+            const active =
+              activeStack === stack.stack && activeCategory === category.category;
+            return (
+              <Link
+                className={
+                  active
+                    ? "sidebar__item sidebar__category is-active"
+                    : "sidebar__item sidebar__category"
+                }
+                // 显示名按语言取 label；跳转参数必须是 key（D28），且 stack+category
+                // 一起带，URL 才可分享、筛选才精确。
+                to={`/library?stack=${encodeURIComponent(stack.stack)}&category=${encodeURIComponent(category.category)}`}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                key={`${stack.stack}/${category.category}`}
+              >
+                {localizedLabel(category.label, language) ?? category.category}
+                <span className="sidebar__count tnum">{category.count}</span>
+              </Link>
+            );
+          })}
         </div>
       ))}
       <p className="sidebar__footnote">{t("chaptersHint")}</p>

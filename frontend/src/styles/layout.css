@@ -236,6 +236,18 @@
   font-weight: var(--weight-title);
 }
 
+/* 分类行现在是链接：选中态沿用 topbar__link.is-active 的同一组 token。 */
+.sidebar__item.is-active {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.sidebar__item.is-active:hover {
+  color: var(--primary);
+  background: var(--primary-soft-hover);
+  text-decoration: none;
+}
+
 .sidebar__count {
   margin-left: var(--space-1);
   color: var(--text-muted);
