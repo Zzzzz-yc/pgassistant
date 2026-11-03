@@ -27,15 +27,24 @@
 
 1. **`resource_slug` 只能是 `CANDIDATES` 里出现过的 slug**。候选集里没有的主题，
    允许写 `"resource_slug": null` 的自定义任务，但 `note` 必须包含「自定义任务」四个字。
-2. 阶段数 **2–8**；整份计划的条目总数 **5–40**；每个阶段至少 1 条。
+2. 阶段数 **2–4**（调整模式下保持 `BASE_PLAN` 的阶段数不变）；整份计划的条目总数
+   **5–40**，从零生成时建议 **≤20**；每个阶段至少 1 条。
 3. 每个阶段 `weeks` ≥ 1，**各阶段 weeks 之和与 `WEEKS` 的偏差不得超过 20%**。
 4. 每条 `est_minutes` 是 10–240 的整数；总和与 `TARGET_MINUTES` 的偏差不得超过 30%。
    绑定资料时优先用候选的 `duration_min`，自定义任务按实际工作量估。
 5. 难度**不得倒挂**：`advanced` 的资料不得出现在比它更简单的阶段之前。
    确实需要提前出现的，在该条目 `note` 里写「选学」。
-6. 阶段标题 ≤30 字；条目标题 ≤80 字；`title`（计划名）≤60 字；`goal` ≤120 字；
-   `note` ≤200 字，没有备注就用空字符串。
+6. 所有 `title`（计划名 / 阶段 / 条目）**≤20 字**；`goal` ≤40 字。
+   `note` 只在「自定义任务」「选学」时写最短标记，其余用空字符串；
+   `description` 用空字符串。**不要输出**解释性长句或候选的 `summary`。
 7. 只用候选集里的资料，**不要编造 slug、不要编造资料标题**。
+
+# 输出体积（硬约束：max_tokens 有限，写长了会被截断）
+
+- 阶段数 ≤4、总条目 ≤20：不要为了「看起来丰富」而拆分或扩写条目。
+- 每个 `title` ≤20 字；不要输出 `notes` / `description` 这类长字段
+  （`description` 写 `""`；`note` 除「自定义任务」「选学」外写 `""`）。
+- 不要复述候选资料、不要解释思路、不要输出代码围栏。
 
 # 输出 JSON（唯一格式）
 
@@ -49,10 +58,10 @@
     {
       "title": "HTML / CSS 基础",
       "weeks": 3,
-      "description": "建立页面结构与样式的基本功",
+      "description": "",
       "items": [
         {"title": "理解盒模型", "resource_slug": "frontend/html-css/css-box-model", "est_minutes": 25, "note": ""},
-        {"title": "手写一个静态页", "resource_slug": null, "est_minutes": 90, "note": "自定义任务"}
+        {"title": "手写静态页", "resource_slug": null, "est_minutes": 90, "note": "自定义任务"}
       ]
     }
   ]

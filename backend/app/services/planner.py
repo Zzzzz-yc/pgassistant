@@ -36,6 +36,7 @@ from .llm_client import (
     LLMClient,
     LLMError,
     LLMFormatUnsupported,
+    LLMResponse,
     strip_fences,
 )
 from .router import clarify_options, normalize
@@ -49,8 +50,31 @@ CANDIDATE_LIMIT = 60
 #: 生成失败重试次数：首次 + 1 次回填重试（§7.6 第三段）。
 MAX_ATTEMPTS = 2
 
-#: 计划生成的输出预算（§7.10：计划 4096）。
-PLAN_MAX_TOKENS = 4096
+#: 计划生成的输出预算下限（§7.10）：一盘 5–40 条的 JSON 在 4096 以下必被截断。
+_PLAN_MAX_TOKENS_MIN = 4096
+#: 上限：再大没有收益，部分上游还会直接 400。
+_PLAN_MAX_TOKENS_MAX = 16384
+
+#: JSON 解析层能观察到的「输出被 max_tokens 截断」信号（末尾不完整才会报这些）。
+_TRUNCATION_MARKERS = (
+    "unterminated string",
+    "expecting ',' delimiter",
+    "unexpected end of json",
+    "expecting value",
+)
+
+#: 命中截断后的压缩指令：用它替换普通校验回填，逼模型把预算花在结构上。
+_COMPACT_FEEDBACK = (
+    "上一次输出被长度限制截断。请只输出合法 JSON，阶段 ≤4 个、条目 ≤20 条，"
+    "每个 title ≤20 字；description 给空字符串，note 只留「自定义任务」标记，"
+    "不要写解释或长文本。"
+)
+#: 调整模式：阶段结构是硬约束，压缩只动条目与文本长度。
+_ADJUST_COMPACT_FEEDBACK = (
+    "上一次输出被长度限制截断。请保持阶段数与每个阶段的标题、周数不变，只重排/替换条目；"
+    "条目 ≤20 条，每个 title ≤20 字；description 给空字符串，"
+    "note 只留「自定义任务」标记，不要写解释或长文本。"
+)
 
 #: 兜底建议条数（§7.6：该目标的 top 10 资料）。
 SUGGESTION_LIMIT = 10
@@ -192,18 +216,51 @@ def _plan_messages(req: AgentPlanDraftRequest, items: list[Candidate], *,
     ]
 
 
-async def _ask_plan(llm: LLMClient, messages: list[dict]) -> str:
+def _plan_max_tokens(llm: LLMClient) -> int:
+    """计划生成实际使用的 `max_tokens`：读客户端持有的配置并夹取。
+
+    只读 `LLMClient.config`（构造时已由 `load_llm_config` 从 settings /
+    `data/config.json` / 环境变量解出，并做过 256–8192 的契约夹取），**不查 DB**。
+    配置缺失/非法 → 下限兜底；低于下限必然截断 40 条目，高于上限只是浪费且
+    部分上游直接 400，所以两侧都夹住。
+    """
+    config = getattr(llm, "config", None)
+    configured = getattr(config, "max_tokens", None)
+    if configured is None:
+        return _PLAN_MAX_TOKENS_MIN
     try:
-        response = await llm.chat(
+        value = int(configured)
+    except (TypeError, ValueError):
+        return _PLAN_MAX_TOKENS_MIN
+    return max(_PLAN_MAX_TOKENS_MIN, min(_PLAN_MAX_TOKENS_MAX, value))
+
+
+def _looks_truncated(text: str, exc: ValueError) -> bool:
+    """JSON 解析失败是否由「输出被截断」造成（而不是模型写了非法结构）。
+
+    两个条件同时成立才算：解析错误是 EOF/未闭合类，且正文没有以 `}` 收尾。
+    宁可漏判（走普通回填重试），也不要把结构错误误判成截断。
+    """
+    body = strip_fences(text)
+    if not body or body.rstrip().endswith("}"):
+        return False
+    lowered = str(exc).lower()
+    return any(marker in lowered for marker in _TRUNCATION_MARKERS)
+
+
+async def _ask_plan(llm: LLMClient, messages: list[dict]) -> LLMResponse:
+    """两次调用（`response_format` / `prompt_only` 降级）共用同一个输出预算。"""
+    max_tokens = _plan_max_tokens(llm)
+    try:
+        return await llm.chat(
             messages,
-            max_tokens=PLAN_MAX_TOKENS,
+            max_tokens=max_tokens,
             temperature=0.2,
             response_format={"type": "json_object"},
         )
     except LLMFormatUnsupported:
         log.info("event=planner.generate fallback=prompt_only reason=response_format")
-        response = await llm.chat(messages, max_tokens=PLAN_MAX_TOKENS, temperature=0.2)
-    return response.text
+        return await llm.chat(messages, max_tokens=max_tokens, temperature=0.2)
 
 
 def _to_int(value):
@@ -315,11 +372,15 @@ async def generate(conn, req: AgentPlanDraftRequest, llm: LLMClient) -> PlanDraf
     }
     target_minutes = req.weeks * req.weekly_hours * 60
 
+    max_tokens = _plan_max_tokens(llm)
     errors: list[str] = []
     feedback = ""
+    truncated = False
     for attempt in range(MAX_ATTEMPTS):
         messages = _plan_messages(req, items, feedback=feedback)
-        raw = await _ask_plan(llm, messages)
+        response = await _ask_plan(llm, messages)
+        raw = response.text
+        attempt_truncated = getattr(response, "finish_reason", None) == "length"
         try:
             draft = _parse_draft(raw)
             plan_validate.fill_estimates(draft, duration_by_slug)
@@ -336,10 +397,25 @@ async def generate(conn, req: AgentPlanDraftRequest, llm: LLMClient) -> PlanDraf
             errors = exc.errors
         except ValueError as exc:            # JSON 解析失败 / 结构校验失败
             errors = [str(exc)]
+            attempt_truncated = attempt_truncated or _looks_truncated(raw, exc)
+        truncated = attempt_truncated
+        if truncated:
+            log.warning("event=planner.truncated attempt=%d max_tokens=%d",
+                        attempt + 1, max_tokens)
         log.info("event=planner.reject attempt=%d errors=%d", attempt + 1, len(errors))
-        feedback = _feedback(errors)
+        if attempt + 1 < MAX_ATTEMPTS:
+            if truncated:
+                log.info("event=planner.compact_retry attempt=%d", attempt + 1)
+                feedback = _COMPACT_FEEDBACK
+            else:
+                feedback = _feedback(errors)
 
-    log.warning("event=planner.failed attempts=%d", MAX_ATTEMPTS)
+    log.warning("event=planner.failed attempts=%d truncated=%s", MAX_ATTEMPTS, truncated)
+    if truncated:
+        errors = [
+            "模型输出被长度限制截断（max_tokens=%d）：压缩重试后仍不完整" % max_tokens,
+            *errors,
+        ]
     raise plan_validate.PlanInvalid(errors, suggestions=_suggestions(items))
 
 
@@ -401,14 +477,18 @@ async def adjust(conn, plan: PlanRead, instruction: str, llm: LLMClient) -> Plan
     instruction = normalize(instruction, max_len=500)
     base_plan_json = base.model_dump_json()
 
+    max_tokens = _plan_max_tokens(llm)
     errors: list[str] = []
     feedback = ""
+    truncated = False
     for attempt in range(MAX_ATTEMPTS):
         messages = _plan_messages(
             req, items, feedback=feedback, instruction=instruction,
             base_plan=base_plan_json,
         )
-        raw = await _ask_plan(llm, messages)
+        response = await _ask_plan(llm, messages)
+        raw = response.text
+        attempt_truncated = getattr(response, "finish_reason", None) == "length"
         try:
             generated = _parse_draft(raw)
             if len(generated.stages) != len(base.stages):
@@ -446,9 +526,26 @@ async def adjust(conn, plan: PlanRead, instruction: str, llm: LLMClient) -> Plan
             errors = exc.errors
         except ValueError as exc:
             errors = [str(exc)]
+            attempt_truncated = attempt_truncated or _looks_truncated(raw, exc)
+        truncated = attempt_truncated
+        if truncated:
+            log.warning("event=planner.truncated attempt=%d max_tokens=%d",
+                        attempt + 1, max_tokens)
         log.info("event=planner.adjust_reject attempt=%d errors=%d", attempt + 1, len(errors))
-        feedback = _feedback(errors)
+        if attempt + 1 < MAX_ATTEMPTS:
+            if truncated:
+                log.info("event=planner.compact_retry attempt=%d", attempt + 1)
+                feedback = _ADJUST_COMPACT_FEEDBACK
+            else:
+                feedback = _feedback(errors)
 
+    log.warning("event=planner.adjust_failed attempts=%d truncated=%s",
+                MAX_ATTEMPTS, truncated)
+    if truncated:
+        errors = [
+            "模型输出被长度限制截断（max_tokens=%d）：压缩重试后仍不完整" % max_tokens,
+            *errors,
+        ]
     raise plan_validate.PlanInvalid(errors, suggestions=_suggestions(items))
 
 
