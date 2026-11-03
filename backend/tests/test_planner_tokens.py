@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 
+import httpx
 import pytest
 
 from app.db.connection import connect
@@ -27,6 +29,25 @@ TRUNCATED_JSON = (
     '{"title": "转前端计划", "goal": "三个月转前端", "weeks": 4, "weekly_hours": 1,'
     ' "stages": [{"title": "基础", "weeks": 2, "items": [{"title": "xxx'
 )
+
+#: P2 的核心形状：截断恰好停在 `}` 边界。正文以 `}` 收尾（`_looks_truncated`
+#: 会当成「输出完整」），但外层对象其实还差一个键，json 报 `Expecting property name`。
+BRACE_BOUNDARY_JSON = (
+    '{"title": "转前端计划", "goal": "三个月转前端", "weeks": 4, "weekly_hours": 1,}'
+)
+
+#: 校验能过但条目不足的草稿（合法 JSON，只是内容不全）。
+THIN_DRAFT = {
+    "title": "转前端计划",
+    "goal": "三个月转前端",
+    "weeks": 4,
+    "weekly_hours": 1,
+    "stages": [
+        {"title": "基础", "weeks": 4,
+         "items": [{"title": "读 HTML", "resource_slug": None,
+                    "est_minutes": 40, "note": "自定义任务"}]},
+    ],
+}
 
 
 def _valid_draft() -> dict:
@@ -70,7 +91,13 @@ class StubLLM:
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
-        return LLMResponse(text=reply, tokens_in=10, tokens_out=10, model="mock-model")
+        finish_reason = None
+        if isinstance(reply, tuple):            # (正文, 上游 finish_reason)
+            reply, finish_reason = reply
+        return LLMResponse(
+            text=reply, tokens_in=10, tokens_out=10, model="mock-model",
+            finish_reason=finish_reason,
+        )
 
 
 def _messages_text(call: dict) -> str:
@@ -166,6 +193,177 @@ def test_prompt_only_fallback_keeps_same_budget(db_path):
         assert [call["max_tokens"] for call in llm.calls] == [8192, 8192]
         assert llm.calls[0]["response_format"] is not None
         assert llm.calls[1]["response_format"] is None
+        assert draft.stages
+    finally:
+        conn.close()
+
+
+# ----------------------------------------------------- finish_reason（P2 修复）
+def _parse_chat(data):
+    """直接走 `_parse_chat`：不建 httpx 客户端、不触网。"""
+    config = LLMConfig(base_url=MOCK_BASE, api_key=MOCK_KEY, model="mock-model")
+    client = object.__new__(llm_client.LLMClient)
+    return client._parse_chat(data, [], config)
+
+
+def test_parse_chat_exposes_finish_reason():
+    data = {
+        "model": "mock-model",
+        "choices": [{"message": {"content": "{}"}, "finish_reason": "length"}],
+        "usage": {"prompt_tokens": 3, "completion_tokens": 4},
+    }
+    response = _parse_chat(data)
+
+    assert response.finish_reason == "length"
+    # 既有字段只做加法：文本与 token 计数不受影响
+    assert (response.text, response.tokens_in, response.tokens_out) == ("{}", 3, 4)
+
+
+@pytest.mark.parametrize("value", [None, 123, ["length"], {"reason": "length"}])
+def test_parse_chat_non_string_finish_reason_is_none(value):
+    """上游字段缺失 / 非字符串：收敛成 None，**不抛错**。"""
+    data = {
+        "choices": [{"message": {"content": "{}"}, "finish_reason": value}],
+        "usage": {"prompt_tokens": 3, "completion_tokens": 4},
+    }
+    assert _parse_chat(data).finish_reason is None
+
+
+def test_parse_chat_without_finish_reason_is_none():
+    """上游完全不返回 finish_reason（老服务商 / stub）也不抛错。"""
+    data = {
+        "choices": [{"message": {"content": "{}"}}],
+        "usage": {"prompt_tokens": 3, "completion_tokens": 4},
+    }
+    assert _parse_chat(data).finish_reason is None
+
+
+def test_finish_reason_length_with_valid_draft_is_accepted_in_one_call(db_path):
+    """finish_reason=length 但草稿合法且通过校验：不接受多余重试。"""
+    conn = connect(db_path)
+    try:
+        req = planner.AgentPlanDraftRequest(goal="前端", weeks=4, weekly_hours=1)
+        llm = StubLLM([
+            (json.dumps(_valid_draft(), ensure_ascii=False), "length"),
+        ])
+
+        draft = asyncio.run(planner.generate(conn, req, llm))
+
+        assert len(llm.calls) == 1                 # 关键：1 次调用，不压缩重试
+        assert sum(len(stage.items) for stage in draft.stages) == 6
+    finally:
+        conn.close()
+
+
+def test_finish_reason_length_validation_failure_retries_compact(db_path, caplog):
+    """JSON 合法但**校验失败**（条目不足）+ finish_reason=length → 压缩重试。"""
+    caplog.set_level(logging.WARNING, logger="pgassistant.planner")
+    conn = connect(db_path)
+    try:
+        req = planner.AgentPlanDraftRequest(goal="前端", weeks=4, weekly_hours=1)
+        llm = StubLLM([
+            (json.dumps(THIN_DRAFT, ensure_ascii=False), "length"),
+            (json.dumps(_valid_draft(), ensure_ascii=False), "stop"),
+        ])
+
+        draft = asyncio.run(planner.generate(conn, req, llm))
+
+        assert len(llm.calls) == 2
+        assert "截断" in _messages_text(llm.calls[1])   # 压缩指令，不是普通回填
+        assert "条目 ≤20 条" in _messages_text(llm.calls[1])
+        assert "by=finish_reason" in caplog.text
+        assert draft.stages
+    finally:
+        conn.close()
+
+
+def test_brace_boundary_truncation_is_detected_by_finish_reason(db_path, caplog):
+    """P2 核心场景：截断停在 `}` 边界，`Expecting property name`。
+
+    正文以 `}` 收尾 → `_looks_truncated` 判不出来（这是修复前的唯一信号），
+    现在由 `finish_reason="length"` 兜住，第一次就改走压缩重试。
+    """
+    with pytest.raises(ValueError) as info:
+        json.loads(BRACE_BOUNDARY_JSON)
+    assert "expecting property name" in str(info.value).lower()
+    assert BRACE_BOUNDARY_JSON.rstrip().endswith("}")
+    assert planner._looks_truncated(BRACE_BOUNDARY_JSON, info.value) is False
+
+    caplog.set_level(logging.WARNING, logger="pgassistant.planner")
+    conn = connect(db_path)
+    try:
+        req = planner.AgentPlanDraftRequest(goal="前端", weeks=4, weekly_hours=1)
+        llm = StubLLM([
+            (BRACE_BOUNDARY_JSON, "length"),
+            (json.dumps(_valid_draft(), ensure_ascii=False), "stop"),
+        ])
+
+        draft = asyncio.run(planner.generate(conn, req, llm))
+
+        assert len(llm.calls) == 2
+        second = _messages_text(llm.calls[1])
+        assert "截断" in second
+        assert "阶段 ≤4" in second
+        assert "by=finish_reason" in caplog.text
+        assert draft.stages
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize(("raw", "marker"), [
+    ('{"title": "x", "stages": [{"title": "a"}],', "expecting property name"),
+    ('{"title": ', "expecting value"),
+])
+def test_looks_truncated_covers_partial_key_markers(raw, marker):
+    """新增的 JSON 报错标记：正文停在键名中间 / 值之前。"""
+    with pytest.raises(ValueError) as info:
+        json.loads(raw)
+
+    assert marker in str(info.value).lower()
+    assert planner._looks_truncated(raw, info.value) is True
+
+
+def test_chat_finish_reason_length_flows_into_planner_without_retry(db_path):
+    """端到端：真实 `LLMClient.chat` 解析上游 finish_reason，planner 只调 1 次。"""
+    payload = {
+        "model": "mock-model",
+        "choices": [{
+            "message": {"content": json.dumps(_valid_draft(), ensure_ascii=False)},
+            "finish_reason": "length",
+        }],
+        "usage": {"prompt_tokens": 100, "completion_tokens": 200},
+    }
+    seen: list[dict] = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json=payload)
+
+    conn = connect(db_path)
+    try:
+        async def go():
+            async with httpx.AsyncClient(
+                transport=httpx.MockTransport(handler)
+            ) as http_client:
+                client = llm_client.LLMClient(
+                    LLMConfig(base_url=MOCK_BASE, api_key=MOCK_KEY,
+                              model="mock-model", max_tokens=8192),
+                    client=http_client,
+                )
+                response = await client.chat(
+                    [{"role": "user", "content": "[1, 2]"}], max_tokens=8192,
+                )
+                assert response.finish_reason == "length"
+                req = planner.AgentPlanDraftRequest(
+                    goal="前端", weeks=4, weekly_hours=1
+                )
+                return await planner.generate(conn, req, client)
+
+        draft = asyncio.run(go())
+
+        # 1 次是上面的手动 chat（验证解析），1 次是 planner.generate；
+        # 若 planner 因 finish_reason=length 多跑一次压缩重试，这里会是 3。
+        assert len(seen) == 2
         assert draft.stages
     finally:
         conn.close()

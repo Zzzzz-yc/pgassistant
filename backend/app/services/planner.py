@@ -61,6 +61,9 @@ _TRUNCATION_MARKERS = (
     "expecting ',' delimiter",
     "unexpected end of json",
     "expecting value",
+    # 截断停在「对象已开、键还没写完」的位置（例如正文停在 `{"a":1,`）：
+    # Python json 报 "Expecting property name enclosed in double quotes"。
+    "expecting property name",
 )
 
 #: 命中截断后的压缩指令：用它替换普通校验回填，逼模型把预算花在结构上。
@@ -248,6 +251,22 @@ def _looks_truncated(text: str, exc: ValueError) -> bool:
     return any(marker in lowered for marker in _TRUNCATION_MARKERS)
 
 
+def _truncation_source(response: LLMResponse, raw: str,
+                       exc: ValueError | None = None) -> str:
+    """截断判定来源：`finish_reason`（上游明说被长度截断）/ `json`（解析错误形态）。
+
+    返回空串表示不判定为截断。两个信号都命中时记 `finish_reason+json`。
+    `finish_reason` 能覆盖「截断恰好停在 `}` 边界、JSON 仍能解析但内容不全」——
+    这种输出 `_looks_truncated` 看不见（正文以 `}` 收尾），只能靠上游信号。
+    """
+    sources: list[str] = []
+    if response.finish_reason == "length":
+        sources.append("finish_reason")
+    if exc is not None and _looks_truncated(raw, exc):
+        sources.append("json")
+    return "+".join(sources)
+
+
 async def _ask_plan(llm: LLMClient, messages: list[dict]) -> LLMResponse:
     """两次调用（`response_format` / `prompt_only` 降级）共用同一个输出预算。"""
     max_tokens = _plan_max_tokens(llm)
@@ -380,7 +399,6 @@ async def generate(conn, req: AgentPlanDraftRequest, llm: LLMClient) -> PlanDraf
         messages = _plan_messages(req, items, feedback=feedback)
         response = await _ask_plan(llm, messages)
         raw = response.text
-        attempt_truncated = getattr(response, "finish_reason", None) == "length"
         try:
             draft = _parse_draft(raw)
             plan_validate.fill_estimates(draft, duration_by_slug)
@@ -392,16 +410,18 @@ async def generate(conn, req: AgentPlanDraftRequest, llm: LLMClient) -> PlanDraf
             )
             if warnings:
                 log.info("event=planner.warnings count=%d", len(warnings))
+            # 校验通过就接受：即使 finish_reason="length" 也不多花一次调用。
             return cleaned
         except plan_validate.PlanInvalid as exc:
             errors = exc.errors
+            attempt_source = _truncation_source(response, raw)
         except ValueError as exc:            # JSON 解析失败 / 结构校验失败
             errors = [str(exc)]
-            attempt_truncated = attempt_truncated or _looks_truncated(raw, exc)
-        truncated = attempt_truncated
+            attempt_source = _truncation_source(response, raw, exc)
+        truncated = bool(attempt_source)
         if truncated:
-            log.warning("event=planner.truncated attempt=%d max_tokens=%d",
-                        attempt + 1, max_tokens)
+            log.warning("event=planner.truncated attempt=%d max_tokens=%d by=%s",
+                        attempt + 1, max_tokens, attempt_source)
         log.info("event=planner.reject attempt=%d errors=%d", attempt + 1, len(errors))
         if attempt + 1 < MAX_ATTEMPTS:
             if truncated:
@@ -488,7 +508,6 @@ async def adjust(conn, plan: PlanRead, instruction: str, llm: LLMClient) -> Plan
         )
         response = await _ask_plan(llm, messages)
         raw = response.text
-        attempt_truncated = getattr(response, "finish_reason", None) == "length"
         try:
             generated = _parse_draft(raw)
             if len(generated.stages) != len(base.stages):
@@ -521,16 +540,18 @@ async def adjust(conn, plan: PlanRead, instruction: str, llm: LLMClient) -> Plan
             )
             if warnings:
                 log.info("event=planner.adjust warnings=%d", len(warnings))
+            # 校验通过就接受：即使 finish_reason="length" 也不多花一次调用。
             return cleaned
         except plan_validate.PlanInvalid as exc:
             errors = exc.errors
+            attempt_source = _truncation_source(response, raw)
         except ValueError as exc:
             errors = [str(exc)]
-            attempt_truncated = attempt_truncated or _looks_truncated(raw, exc)
-        truncated = attempt_truncated
+            attempt_source = _truncation_source(response, raw, exc)
+        truncated = bool(attempt_source)
         if truncated:
-            log.warning("event=planner.truncated attempt=%d max_tokens=%d",
-                        attempt + 1, max_tokens)
+            log.warning("event=planner.truncated attempt=%d max_tokens=%d by=%s",
+                        attempt + 1, max_tokens, attempt_source)
         log.info("event=planner.adjust_reject attempt=%d errors=%d", attempt + 1, len(errors))
         if attempt + 1 < MAX_ATTEMPTS:
             if truncated:
