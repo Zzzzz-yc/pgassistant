@@ -196,6 +196,9 @@ class LLMResponse:
     #: 上游没返回 `usage` 时为 True（`done.usage.estimated` 直接用它）。
     #: 契约 §2.4 只列了前四个字段；这里**追加一个带默认值**的字段，位置参数顺序不变。
     estimated: bool = False
+    #: 上游 `choices[0].finish_reason`（`"length"` 表示输出被 `max_tokens` 截断）。
+    #: 缺失或不是字符串 → `None`。同样是**追加**字段，既有四个位置参数顺序不变。
+    finish_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -697,12 +700,19 @@ class LLMClient:
             tokens_in = _as_int(usage.get("prompt_tokens"), 0)
             tokens_out = _as_int(usage.get("completion_tokens"), 0)
         model = data.get("model") if isinstance(data.get("model"), str) else config.model
+        # `finish_reason` 只做类型收敛：缺失 / 非字符串一律 None，绝不因此报错。
+        # 上游用 `"length"` 表示被 max_tokens 截断，planner 用它兜住
+        # 「截断恰好停在 `}` 边界、JSON 仍能解析」这种解析层看不见的情况。
+        finish_reason = first.get("finish_reason")
+        if not isinstance(finish_reason, str):
+            finish_reason = None
         return LLMResponse(
             text=text,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             model=model,
             estimated=estimated,
+            finish_reason=finish_reason,
         )
 
     # ------------------------------------------------------------- 流式
