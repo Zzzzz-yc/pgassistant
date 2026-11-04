@@ -1,8 +1,6 @@
 name: CI
 
-# 内容校验 → 后端回归 → 前端构建。
-# 只跑仓库里真实存在的脚本：backend/scripts/validate_content.py、pytest、npm run build。
-# 不引 ruff / eslint（尚未接入项目依赖），也不做媒体体积检查（validate_content 已含单文件与总量上限）。
+# 内容校验 → 后端回归 → 前端构建
 
 on:
   push:

@@ -53,6 +53,8 @@ build/
 logs/
 tmp/
 .cache/
+
+# 本地临时产物（截图等）
 .m3-*
 .shots/
 
@@ -63,23 +65,22 @@ tmp/
 .DS_Store
 Thumbs.db
 
-# Obsidian / 本地编辑器配置：本人笔记库配置，含社区插件二进制，不入库
+# 本地笔记库与编辑器插件目录（含二进制，不入库）
 .obsidian/
 .claudian/
 
-# git worktree 并行开发目录（每个分支一份工作副本，属本地产物）
+# 并行工作副本目录（本地产物）
 .worktrees/
 
-# 大文件（注意不要写 *.png / *.webp，否则 content/assets 会漏提交）
+# 大文件（图片除外：content/assets 的配图需入库）
 *.mp4
 *.mov
 *.zip
 
-# 交接包备份（项目根就是本仓库，这里只作为后备资料库，绝不入库）
+# 工作过程资料，不入库
 handoff/
 
-# Pyodide 运行时副本（M6 由 frontend/scripts/copy-pyodide.mjs 在 predev/prebuild 生成，
-# 13 MB 二进制不入库；离线前提是至少完成过一次 npm install）
+# Pyodide 运行时副本（构建时生成，13 MB 二进制不入库；离线需先完成一次构建）
 frontend/public/assets/pyodide/
 frontend/public/pyodide/
 
@@ -96,8 +97,7 @@ htmlcov/
 .mypy_cache/
 .eslintcache
 
-# 内容准备过程中的中间产物（`data/` 已整体忽略，这里再显式兜一层，
-# 防止有人临时把 --sources 指到仓库内其它位置）
+# 内容准备过程中的中间产物
 *.partial
 data/.sources/
 data/.repro/

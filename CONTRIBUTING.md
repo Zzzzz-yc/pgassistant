@@ -1,7 +1,6 @@
 # 贡献指南
 
-> 先读 [README.md](README.md) 了解产品与启动方式。内部规格与接口契约不随仓库分发，
-> 需要时请在项目维护者处获取。
+> 先读 [README.md](README.md) 了解产品与启动方式。
 
 ## 1. 本地启动
 
@@ -68,7 +67,7 @@ python -m pytest -q --basetemp=data/.pytest-tmp   # 该路径已在 .gitignore
 ├─ frontend/                                   # React + Vite（dist/、node_modules/ 不入库）
 ├─ content/                                    # 内容库：_meta/ 手写元数据随仓库，正文本地生成
 ├─ tools/                                      # 内容准备与转换脚本
-├─ docs/                                       # 内容来源许可、可选启动器说明
+├─ docs/                                       # 内容来源许可
 └─ data/                                       # 运行时数据（不入库）
 ```
 
@@ -93,13 +92,13 @@ python -m pytest -q --basetemp=data/.pytest-tmp   # 该路径已在 .gitignore
 - [ ] `python -m pytest -q` 全绿
 - [ ] 改了前端：`npm run build --prefix frontend` 通过（`build` 内含 `tsc --noEmit`）
 - [ ] 改了内容结构（分类、模板、分词词典）：同步 `content/_meta/` 下的文件
-- [ ] 没有 `data/`、`*.db`、`.env`、`.venv/`、`.deps/`、`handoff/`
+- [ ] 没有 `data/`、`*.db`、`.env`、`.venv/`、`.deps/`
 - [ ] 没有 `jieba.cache`、`pytest-of-*`、`dist/`、`node_modules/`、截图等本地产物
 - [ ] 没有把本机绝对路径（`C:/Users/...`）写进代码或文档
 - [ ] 新增英文文案已同步 `frontend/src/i18n/locales/en-US/`
 
 提交信息用 Conventional Commits：`feat(scope): ...`、`fix(scope): ...`、`docs(contract): ...`、`chore: ...`。
-一个提交只做一件事；契约变更与实现变更分开提交，方便回滚。
+一个提交只做一件事；接口变更与实现变更分开提交，方便回滚。
 
 ## 6. 不要提交 data/
 

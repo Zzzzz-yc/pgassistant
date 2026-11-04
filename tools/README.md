@@ -9,7 +9,6 @@
 | `fetch_intro.py` | 按 sources.json 抓外站教程的**正文主体**，生成项目格式 Markdown | 补内容时 |
 | `optimize_media.py` | 超 300KB 图片转 WebP 并改写引用 | 加了图片之后 |
 | `sources.json` | **抓取目标的唯一事实来源**，新增内容只改这里 | 每次补内容 |
-| `conversion-report.md` | 转换过程与质量记录 | 归档 |
 
 ## 抓取规则（sources.json 的 `rules`）
 
@@ -19,7 +18,7 @@
 
 | 键 | 含义 |
 |---|---|
-| `only_summary` | 已废弃的旧开关。固定为 `false`：提取完整正文，不再只取「摘要 + 前 5 段要点 + 速查表」。置为 `true` 时脚本只打印提示，仍按完整正文处理 |
+| `only_summary` | 已废弃，固定为 `false`，脚本忽略该键 |
 | `max_body_chars` | 单篇正文上限（去空白字符数）。超过时按段落边界截断，并在文末标注「节选，原文见 source_url」 |
 | `fetch_interval_sec` | 同一域名的请求间隔，**不得小于 1.0 秒**（脚本内强制取 `max(1.0, 配置值)`） |
 
@@ -27,15 +26,14 @@
 
 - 遵守各站 `robots.txt`；被禁止的 URL 直接失败并记录原因，不绕过。
 - 同一域名串行请求（脚本单线程），间隔 ≥1 秒；失败重试 2 次，指数退避。
-- 纯标准库：`urllib` + `html.parser`，不引第三方 HTML 解析库。
 - 正文提取保留 h2/h3 标题层级、代码块（含语言标记）、表格、列表；剔除导航、页脚、侧栏、广告、评论区、「本页译自」类样板。
-- 已适配页面结构：`runoob.com`（`#content` / `.article-intro`）、`developer.mozilla.org`（`main#content`）、`zh-hans.react.dev`（`article`）、`typescriptlang.org`（`article .markdown`）；其它站点走 `<main>`/`<article>` 兜底。
-- 输出：只重写 `body_md`；front-matter 除按正文重算的 `duration_min`（算式同 `indexer.estimate_minutes`：中文字数/400，夹取 5–120）外逐字保留（`summary`/`license`/`source_url` 等一律不动）。`body_md` 统一 LF、UTF-8 无 BOM；正文末尾保留 `source_url` 与许可的引用说明。
+- 已适配 runoob、MDN、react.dev、TypeScript 文档；其它站点走 `<main>`/`<article>` 兜底。
+- 输出：只重写 `body_md`；front-matter 除按正文重算的 `duration_min`（中文字数 / 400，夹取 5–120 分钟）外逐字保留（`summary`/`license`/`source_url` 等一律不动）。`body_md` 统一 LF、UTF-8 无 BOM；正文末尾保留 `source_url` 与许可的引用说明。
 
 ## 典型流程
 
 ```
-补内容:  改 sources.json → fetch_intro.py → validate_content.py → bootstrap_index.py → content_gaps.py
+补内容:  改 sources.json → fetch_intro.py → validate_content.py → bootstrap_index.py
 换图片:  放入 content/assets → optimize_media.py → validate_content.py
 改内容源: convert_content.py / split_jwasham.py → validate_content.py → bootstrap_index.py
 ```

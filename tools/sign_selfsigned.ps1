@@ -75,7 +75,7 @@ function Import-UserCertificate([string]$StoreName, [string]$Thumbprint) {
 try {
     Write-Step "检查 pgassistant.exe"
     if (-not (Test-Path -LiteralPath $Exe)) {
-        throw "找不到 $Exe；先运行 tools/build_exe.py 构建（见 docs/launcher-exe.md）。"
+        throw "找不到 $Exe；先运行 tools/build_exe.py 构建。"
     }
     $exeInfo = Get-Item -LiteralPath $Exe
     Write-Ok "找到 $($exeInfo.FullName)（$([math]::Round($exeInfo.Length / 1MB, 1)) MiB）"
