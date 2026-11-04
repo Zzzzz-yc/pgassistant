@@ -20,7 +20,7 @@ body:
       label: 复现步骤
       description: 从启动开始的几步操作；能稳定复现最有用。
       placeholder: |
-        1. `.\start.ps1`
+        1. `start.cmd`
         2. 打开 http://127.0.0.1:8000/library
         3. 筛选 stack=frontend
     validations:

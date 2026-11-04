@@ -1,6 +1,5 @@
 # 统一换行：无论本机 core.autocrlf 怎么设，checkout 出来都是 LF。
-# 理由：content/*.md 的正文与 tools 生成的 md 都用 \n；CRLF 只会制造
-# 满屏 diff 噪音，并让 body_md 里混进 \r（HANDOFF §3 第 5 条）。
+# 理由：正文与生成的 Markdown 统一用 \n；CRLF 会产生 diff 噪音并混进 \r
 * text=auto eol=lf
 
 # Windows 批处理必须是 CRLF，否则 cmd.exe 解析多行 if 块会出岔子

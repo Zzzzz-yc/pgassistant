@@ -3,7 +3,7 @@
 """content_gaps.py — 主题覆盖体检：跑一批典型查询，找出内容缺口。
 
 用法: python backend/scripts/content_gaps.py --db data/app.db
-输出: JSON（stdout）+ docs/gap-probe.json
+输出: JSON（stdout）+ data/gap-probe.json
 """
 import argparse
 import json
@@ -39,7 +39,7 @@ PROBES = {
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default=str(PROJECT / "data" / "app.db"))
-    ap.add_argument("--out", default=str(PROJECT / "docs" / "gap-probe.json"))
+    ap.add_argument("--out", default=str(PROJECT / "data" / "gap-probe.json"))
     args = ap.parse_args()
 
     conn = connect(Path(args.db))
