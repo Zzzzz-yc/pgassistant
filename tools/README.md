@@ -1,6 +1,6 @@
 # tools/ — 内容维护脚本
 
-这些脚本只在**维护内容**时用，不参与应用运行。
+这些脚本由启动器或维护者使用；其中 `prepare_content.py` 会在首次启动时自动执行。
 
 | 脚本 | 作用 | 什么时候跑 |
 |---|---|---|
@@ -9,6 +9,8 @@
 | `fetch_intro.py` | 按 sources.json 抓外站教程的**正文主体**，生成项目格式 Markdown | 补内容时 |
 | `optimize_media.py` | 超 300KB 图片转 WebP 并改写引用 | 加了图片之后 |
 | `sources.json` | **抓取目标的唯一事实来源**，新增内容只改这里 | 每次补内容 |
+| `build_exe.py` | 可选：打包为单文件 exe，仅本机自用 | 需要单文件启动器时 |
+| `sign_selfsigned.ps1` | 可选：给该 exe 做本机自签名，证书仅本机有效、不能对外分发 | 打包后签名时 |
 
 ## 抓取规则（sources.json 的 `rules`）
 
